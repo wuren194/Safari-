@@ -17,7 +17,7 @@
 // @grant                  GM_setValue
 // @run-at                 document-body
 // @icon                   https://raw.githubusercontent.com/ChinaGodMan/UserScriptsHistory/main/scriptsIcon/x.svg
-// @version                2025.6.4.3-简化版
+// @version                2025.6.4.4-简化版
 // @updateURL    https://raw.githubusercontent.com/wuren194/Safari-/main/Twitter%20%E6%98%BE%E7%A4%BA%E6%AD%A3%E5%B8%B8%E7%9A%84%E6%97%A5%E6%9C%9F%E5%92%8C%E6%97%B6%E9%97%B4.user.js
 // @downloadURL  https://raw.githubusercontent.com/wuren194/Safari-/main/Twitter%20%E6%98%BE%E7%A4%BA%E6%AD%A3%E5%B8%B8%E7%9A%84%E6%97%A5%E6%9C%9F%E5%92%8C%E6%97%B6%E9%97%B4.user.js
 // @supportURL   https://github.com/wuren194/Safari-/issues
@@ -286,9 +286,8 @@
                     '[role="progressbar"]',
                     // SVG 图标（通常是按钮的一部分）
                     'svg',
-                    // 推文文字区域
-                    '[data-testid="tweetText"]',
-                    '[lang]'  // 带语言标签的文字内容
+                    // 推文文字区域（允许选中复制）
+                    '[data-testid="tweetText"]'
                 ]
 
                 // 检查点击目标是否在排除列表中
