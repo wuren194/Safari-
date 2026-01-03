@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Safari 脚本一键安装</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            color: #fff;
+            padding: 40px 20px;
+        }
+        .container { max-width: 800px; margin: 0 auto; }
+        h1 {
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 2rem;
+        }
+        .subtitle {
+            text-align: center;
+            color: #888;
+            margin-bottom: 30px;
+        }
+        .btn-all {
+            display: block;
+            width: 100%;
+            padding: 20px;
+            font-size: 18px;
+            font-weight: bold;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            border-radius: 12px;
+            color: white;
+            cursor: pointer;
+            margin-bottom: 30px;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .btn-all:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+        }
+        .script-list {
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            padding: 20px;
+        }
+        .script-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .script-item:last-child { border-bottom: none; }
+        .script-name { font-size: 14px; }
+        .script-btn {
+            padding: 6px 16px;
+            background: #4CAF50;
+            border: none;
+            border-radius: 20px;
+            color: white;
+            font-size: 12px;
+            cursor: pointer;
+            text-decoration: none;
+            transition: background 0.2s;
+        }
+        .script-btn:hover { background: #45a049; }
+        .note {
+            text-align: center;
+            margin-top: 20px;
+            color: #666;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧩 Safari 脚本安装</h1>
+        <p class="subtitle">点击下方按钮批量打开所有脚本安装页面</p>
+        
+        <button class="btn-all" onclick="installAll()">🚀 一键打开所有脚本 (38个)</button>
+        
+        <div class="script-list" id="scriptList"></div>
+        
+        <p class="note">⚠️ 请确保已安装 Tampermonkey 扩展</p>
+    </div>
+
+    <script>
+        const scripts = [
+            { name: "18comic漫画下载", file: "18comic%E6%BC%AB%E7%94%BB%E4%B8%8B%E8%BD%BD.user.js" },
+            { name: "222号巴士通票", file: "222%E5%8F%B7%E5%B7%B4%E5%A3%AB%E9%80%9A%E7%A5%A8.user.js" },
+            { name: "Advanced Search Assistant for Google", file: "Advanced%20Search%20Assistant%20for%20Google.user.js" },
+            { name: "Behance 最高画质下载按钮", file: "Behance%20%E6%9C%80%E9%AB%98%E7%94%BB%E8%B4%A8%E4%B8%8B%E8%BD%BD%E6%8C%89%E9%92%AE.user.js" },
+            { name: "CNM.R18", file: "CNM.R18.user.js" },
+            { name: "Coomer Video Poster + 批量抓取", file: "Coomer%20Video%20Poster%20%2B%20%E5%9B%BE%E7%89%87%E4%B8%8B%E8%BD%BD%20%2B%20%E8%87%AA%E5%8A%A8%E7%BF%BB%E9%A1%B5%20%2B%20%E6%89%B9%E9%87%8F%E6%8A%93%E5%8F%96.user.js" },
+            { name: "DownloadAllContent", file: "DownloadAllContent.user.js" },
+            { name: "Find Scripts For This Site", file: "Find%20Scripts%20For%20This%20Site.user.js" },
+            { name: "GitHub Folder Downloader", file: "GitHub%20Folder%20Downloader.user.js" },
+            { name: "Github Copy Raw File URL", file: "Github%20Copy%20Raw%20File%20URL%20and%20Download%20File.user.js" },
+            { name: "Greasyfork Search with Sleazyfork", file: "Greasyfork%20Search%20with%20Sleazyfork%20Results%20include.user.js" },
+            { name: "Hitomi - Search & UI Tweaks", file: "Hitomi%20-%20Search%20%26%20UI%20Tweaks.user.js" },
+            { name: "LOLICON Hentai Enhancer", file: "LOLICON%20Hentai%20Enhancer.user.js" },
+            { name: "LPSG 多功能工具箱 v23.0", file: "LPSG%20%E5%A4%9A%E5%8A%9F%E8%83%BD%E5%B7%A5%E5%85%B7%E7%AE%B1%20(v23.0%20%E6%92%AD%E6%94%BE%E5%99%A8%E4%BF%AE%E5%A4%8D%E7%89%88).user.js" },
+            { name: "Lyra Exporter Fetch", file: "Lyra%20Exporter%20Fetch%20(One-Click%20AI%20Chat%20Backup).user.js" },
+            { name: "Manwa漫画下载器 v7.6", file: "Manwa%E6%BC%AB%E7%94%BB%E4%B8%8B%E8%BD%BD%E5%99%A8%20v7.6%20(Safari%E5%8E%9F%E7%94%9FFetch%E4%BF%AE%E5%A4%8D%E7%89%88).user.js" },
+            { name: "MissAV Enhanced Assistant", file: "MissAV%20Enhanced%20Assistant.user.js" },
+            { name: "Multi Forum Read Marker", file: "Multi%20Forum%20Read%20Marker.user.js" },
+            { name: "Pagetual (自动翻页)", file: "Pagetual.user.js" },
+            { name: "SSM.fun 视频高度智能限制", file: "SSM.fun%20%E8%A7%86%E9%A2%91%E9%AB%98%E5%BA%A6%E6%99%BA%E8%83%BD%E9%99%90%E5%88%B6.user.js" },
+            { name: "Safari 截图搜图", file: "Safari%20%E6%88%AA%E5%9B%BE%E6%90%9C%E5%9B%BE.user.js" },
+            { name: "Telegram Media Downloader", file: "Telegram%20Media%20Downloader.user.js" },
+            { name: "ThisVid.com Improved", file: "ThisVid.com%20Improved.user.js" },
+            { name: "Twitter 显示正常日期时间", file: "Twitter%20%E6%98%BE%E7%A4%BA%E6%AD%A3%E5%B8%B8%E7%9A%84%E6%97%A5%E6%9C%9F%E5%92%8C%E6%97%B6%E9%97%B4.user.js" },
+            { name: "Twitter-X Media Downloader", file: "Twitter-X%20Media%20Downloader%20(Safari%E4%BF%AE%E5%A4%8D%E7%89%88).user.js" },
+            { name: "Video Quality Fixer for X", file: "Video%20Quality%20Fixer%20for%20X%20(Twitter).user.js" },
+            { name: "XHS-Downloader (小红书)", file: "XHS-Downloader%20(Live%E4%BF%AE%E5%A4%8D%2BUI%E7%BB%88%E6%9E%81%E7%89%88).user.js" },
+            { name: "XnxxVideos One-Click Downloader", file: "XnxxVideos%20One-Click%20Video%20Downloader.user.js" },
+            { name: "manwa图片下载PDF版", file: "manwa%E5%9B%BE%E7%89%87%E4%B8%8B%E8%BD%BDPDF%E7%89%88.user.js" },
+            { name: "mens1069优化", file: "mens1069%E4%BC%98%E5%8C%96.user.js" },
+            { name: "nhentai Pro", file: "nhentai%20Pro.user.js" },
+            { name: "tt1069 jammer remove", file: "tt1069%20jammer%20remove.user.js" },
+            { name: "xvideos push download", file: "xvideos%20push%20download.user.js" },
+            { name: "zaimanhua漫画页转长图", file: "zaimanhua%E6%BC%AB%E7%94%BB%E9%A1%B5%E8%BD%AC%E9%95%BF%E5%9B%BE.user.js" },
+            { name: "一同看视频下载器 v8.0", file: "%E4%B8%80%E5%90%8C%E7%9C%8B%E8%A7%86%E9%A2%91%E4%B8%8B%E8%BD%BD%E5%99%A8%20v8.0%20(%E6%B2%89%E6%B5%B8%E5%BC%8F%E6%92%AD%E6%94%BE%E5%99%A8).user.js" },
+            { name: "书签侧边栏（优化浅色模式）", file: "%E4%B9%A6%E7%AD%BE%E4%BE%A7%E8%BE%B9%E6%A0%8F%EF%BC%88%E4%BC%98%E5%8C%96%E6%B5%85%E8%89%B2%E6%A8%A1%E5%BC%8F%EF%BC%89.user.js" },
+            { name: "屏蔽谷歌搜索站点", file: "%E5%B1%8F%E8%94%BD%E8%B0%B7%E6%AD%8C%E6%90%9C%E7%B4%A2%E7%AB%99%E7%82%B9.user.js" },
+            { name: "解除CSDN登录复制", file: "%E8%A7%A3%E9%99%A4CSDN%E7%99%BB%E5%BD%95%E5%A4%8D%E5%88%B6.user.js" }
+        ];
+
+        const baseUrl = "https://raw.githubusercontent.com/wuren194/Safari-/main/";
+
+        function installAll() {
+            if (confirm(`即将打开 ${scripts.length} 个脚本安装页面，确定继续吗？`)) {
+                scripts.forEach((s, i) => {
+                    setTimeout(() => {
+                        window.open(baseUrl + s.file, '_blank');
+                    }, i * 500); // 每 500ms 打开一个，避免被浏览器拦截
+                });
+            }
+        }
+
+        function renderList() {
+            const list = document.getElementById('scriptList');
+            scripts.forEach(s => {
+                const item = document.createElement('div');
+                item.className = 'script-item';
+                item.innerHTML = `
+                    <span class="script-name">${s.name}</span>
+                    <a class="script-btn" href="${baseUrl + s.file}" target="_blank">安装</a>
+                `;
+                list.appendChild(item);
+            });
+        }
+
+        renderList();
+    </script>
+</body>
+</html>
