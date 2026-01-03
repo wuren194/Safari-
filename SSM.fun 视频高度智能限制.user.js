@@ -9,6 +9,9 @@
 // @grant        GM_setValue
 // @grant        GM_getValue
 // @run-at       document-end
+// @updateURL    https://raw.githubusercontent.com/wuren194/Safari-/main/SSM.fun%20%E8%A7%86%E9%A2%91%E9%AB%98%E5%BA%A6%E6%99%BA%E8%83%BD%E9%99%90%E5%88%B6.user.js
+// @downloadURL  https://raw.githubusercontent.com/wuren194/Safari-/main/SSM.fun%20%E8%A7%86%E9%A2%91%E9%AB%98%E5%BA%A6%E6%99%BA%E8%83%BD%E9%99%90%E5%88%B6.user.js
+// @supportURL   https://github.com/wuren194/Safari-/issues
 // ==/UserScript==
 
 (function() {

@@ -87,6 +87,9 @@
 // @run-at             document-idle
 // @grant              none
 // @license            MIT
+// @updateURL    https://raw.githubusercontent.com/wuren194/Safari-/main/GitHub%20Folder%20Downloader.user.js
+// @downloadURL  https://raw.githubusercontent.com/wuren194/Safari-/main/GitHub%20Folder%20Downloader.user.js
+// @supportURL   https://github.com/wuren194/Safari-/issues
 // ==/UserScript==
 
 // 记录页面宽度是否允许 GitHub 展开完整页面的变量

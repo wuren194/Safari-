@@ -9,6 +9,9 @@
 // @grant        GM_xmlhttpRequest
 // @connect      *
 // @run-at       document-idle
+// @updateURL    https://raw.githubusercontent.com/wuren194/Safari-/main/Behance%20%E6%9C%80%E9%AB%98%E7%94%BB%E8%B4%A8%E4%B8%8B%E8%BD%BD%E6%8C%89%E9%92%AE.user.js
+// @downloadURL  https://raw.githubusercontent.com/wuren194/Safari-/main/Behance%20%E6%9C%80%E9%AB%98%E7%94%BB%E8%B4%A8%E4%B8%8B%E8%BD%BD%E6%8C%89%E9%92%AE.user.js
+// @supportURL   https://github.com/wuren194/Safari-/issues
 // ==/UserScript==
 
 (function () {

@@ -99,6 +99,9 @@
 // @version            2025.03.05.0127
 // @created            2025-03-05 01:27:35
 // @modified           2025-03-05 01:27:35
+// @updateURL    https://raw.githubusercontent.com/wuren194/Safari-/main/xvideos%20push%20download.user.js
+// @downloadURL  https://raw.githubusercontent.com/wuren194/Safari-/main/xvideos%20push%20download.user.js
+// @supportURL   https://github.com/wuren194/Safari-/issues
 // ==/UserScript==
 
 //!人民的勤务员修改自以下脚本  感谢 @cocang @iuroc

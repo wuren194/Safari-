@@ -8,6 +8,9 @@
 // @grant        GM_setValue
 // @grant        GM_getValue
 // @run-at       document-end
+// @updateURL    https://raw.githubusercontent.com/wuren194/Safari-/main/%E4%B9%A6%E7%AD%BE%E4%BE%A7%E8%BE%B9%E6%A0%8F%EF%BC%88%E4%BC%98%E5%8C%96%E6%B5%85%E8%89%B2%E6%A8%A1%E5%BC%8F%EF%BC%89.user.js
+// @downloadURL  https://raw.githubusercontent.com/wuren194/Safari-/main/%E4%B9%A6%E7%AD%BE%E4%BE%A7%E8%BE%B9%E6%A0%8F%EF%BC%88%E4%BC%98%E5%8C%96%E6%B5%85%E8%89%B2%E6%A8%A1%E5%BC%8F%EF%BC%89.user.js
+// @supportURL   https://github.com/wuren194/Safari-/issues
 // ==/UserScript==
 
 (function () {

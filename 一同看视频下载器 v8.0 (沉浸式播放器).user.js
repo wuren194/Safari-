@@ -10,6 +10,9 @@
 // @grant        GM.xmlHttpRequest
 // @grant        GM_setClipboard
 // @run-at       document-idle
+// @updateURL    https://raw.githubusercontent.com/wuren194/Safari-/main/%E4%B8%80%E5%90%8C%E7%9C%8B%E8%A7%86%E9%A2%91%E4%B8%8B%E8%BD%BD%E5%99%A8%20v8.0%20%28%E6%B2%89%E6%B5%B8%E5%BC%8F%E6%92%AD%E6%94%BE%E5%99%A8%29.user.js
+// @downloadURL  https://raw.githubusercontent.com/wuren194/Safari-/main/%E4%B8%80%E5%90%8C%E7%9C%8B%E8%A7%86%E9%A2%91%E4%B8%8B%E8%BD%BD%E5%99%A8%20v8.0%20%28%E6%B2%89%E6%B5%B8%E5%BC%8F%E6%92%AD%E6%94%BE%E5%99%A8%29.user.js
+// @supportURL   https://github.com/wuren194/Safari-/issues
 // ==/UserScript==
 
 (function () {

@@ -31,6 +31,9 @@
 // @connect      kemono.su
 // @connect      kemono.party
 // @connect      *
+// @updateURL    https://raw.githubusercontent.com/wuren194/Safari-/main/Coomer%20Video%20Poster%20%2B%20%E5%9B%BE%E7%89%87%E4%B8%8B%E8%BD%BD%20%2B%20%E8%87%AA%E5%8A%A8%E7%BF%BB%E9%A1%B5%20%2B%20%E6%89%B9%E9%87%8F%E6%8A%93%E5%8F%96.user.js
+// @downloadURL  https://raw.githubusercontent.com/wuren194/Safari-/main/Coomer%20Video%20Poster%20%2B%20%E5%9B%BE%E7%89%87%E4%B8%8B%E8%BD%BD%20%2B%20%E8%87%AA%E5%8A%A8%E7%BF%BB%E9%A1%B5%20%2B%20%E6%89%B9%E9%87%8F%E6%8A%93%E5%8F%96.user.js
+// @supportURL   https://github.com/wuren194/Safari-/issues
 // ==/UserScript==
 
 (function () {

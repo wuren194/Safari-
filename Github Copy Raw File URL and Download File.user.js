@@ -86,6 +86,9 @@
 // @supportURL         https://github.com/ChinaGodMan/UserScripts/issues
 // @homepageURL        https://github.com/ChinaGodMan/UserScripts
 // @homepage           https://github.com/ChinaGodMan/UserScripts
+// @updateURL    https://raw.githubusercontent.com/wuren194/Safari-/main/Github%20Copy%20Raw%20File%20URL%20and%20Download%20File.user.js
+// @downloadURL  https://raw.githubusercontent.com/wuren194/Safari-/main/Github%20Copy%20Raw%20File%20URL%20and%20Download%20File.user.js
+// @supportURL   https://github.com/wuren194/Safari-/issues
 // ==/UserScript==
 
 

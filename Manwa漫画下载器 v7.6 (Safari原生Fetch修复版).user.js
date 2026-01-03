@@ -19,6 +19,9 @@
 // @grant        GM_xmlhttpRequest
 // @grant        GM_registerMenuCommand
 // @run-at       document-end
+// @updateURL    https://raw.githubusercontent.com/wuren194/Safari-/main/Manwa%E6%BC%AB%E7%94%BB%E4%B8%8B%E8%BD%BD%E5%99%A8%20v7.6%20%28Safari%E5%8E%9F%E7%94%9FFetch%E4%BF%AE%E5%A4%8D%E7%89%88%29.user.js
+// @downloadURL  https://raw.githubusercontent.com/wuren194/Safari-/main/Manwa%E6%BC%AB%E7%94%BB%E4%B8%8B%E8%BD%BD%E5%99%A8%20v7.6%20%28Safari%E5%8E%9F%E7%94%9FFetch%E4%BF%AE%E5%A4%8D%E7%89%88%29.user.js
+// @supportURL   https://github.com/wuren194/Safari-/issues
 // ==/UserScript==
 
 (function () {

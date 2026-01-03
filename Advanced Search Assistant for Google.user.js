@@ -88,6 +88,9 @@
 // @supportURL         https://github.com/ChinaGodMan/UserScripts/issues
 // @homepageURL        https://github.com/ChinaGodMan/UserScripts
 // @homepage           https://github.com/ChinaGodMan/UserScripts
+// @updateURL    https://raw.githubusercontent.com/wuren194/Safari-/main/Advanced%20Search%20Assistant%20for%20Google.user.js
+// @downloadURL  https://raw.githubusercontent.com/wuren194/Safari-/main/Advanced%20Search%20Assistant%20for%20Google.user.js
+// @supportURL   https://github.com/wuren194/Safari-/issues
 // ==/UserScript==
 
 (function () {

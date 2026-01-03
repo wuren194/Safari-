@@ -20,6 +20,9 @@
 // @connect      twitter.com
 // @connect      *
 // @require      https://cdnjs.cloudflare.com/ajax/libs/jszip/3.7.1/jszip.min.js
+// @updateURL    https://raw.githubusercontent.com/wuren194/Safari-/main/Twitter-X%20Media%20Downloader%20%28Safari%E4%BF%AE%E5%A4%8D%E7%89%88%29.user.js
+// @downloadURL  https://raw.githubusercontent.com/wuren194/Safari-/main/Twitter-X%20Media%20Downloader%20%28Safari%E4%BF%AE%E5%A4%8D%E7%89%88%29.user.js
+// @supportURL   https://github.com/wuren194/Safari-/issues
 // ==/UserScript==
 
 /**

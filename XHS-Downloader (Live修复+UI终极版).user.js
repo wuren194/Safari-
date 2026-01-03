@@ -25,6 +25,9 @@
 // @license        GNU General Public License v3.0
 // @run-at         document-end
 // @require        https://cdnjs.cloudflare.com/ajax/libs/jszip/3.9.1/jszip.min.js
+// @updateURL    https://raw.githubusercontent.com/wuren194/Safari-/main/XHS-Downloader%20%28Live%E4%BF%AE%E5%A4%8D%2BUI%E7%BB%88%E6%9E%81%E7%89%88%29.user.js
+// @downloadURL  https://raw.githubusercontent.com/wuren194/Safari-/main/XHS-Downloader%20%28Live%E4%BF%AE%E5%A4%8D%2BUI%E7%BB%88%E6%9E%81%E7%89%88%29.user.js
+// @supportURL   https://github.com/wuren194/Safari-/issues
 // ==/UserScript==
 
 (function () {

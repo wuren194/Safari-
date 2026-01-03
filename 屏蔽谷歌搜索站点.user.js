@@ -236,6 +236,9 @@
 // @supportURL         https://github.com/ChinaGodMan/UserScripts/issues
 // @homepageURL        https://github.com/ChinaGodMan/UserScripts
 // @homepage           https://github.com/ChinaGodMan/UserScripts
+// @updateURL    https://raw.githubusercontent.com/wuren194/Safari-/main/%E5%B1%8F%E8%94%BD%E8%B0%B7%E6%AD%8C%E6%90%9C%E7%B4%A2%E7%AB%99%E7%82%B9.user.js
+// @downloadURL  https://raw.githubusercontent.com/wuren194/Safari-/main/%E5%B1%8F%E8%94%BD%E8%B0%B7%E6%AD%8C%E6%90%9C%E7%B4%A2%E7%AB%99%E7%82%B9.user.js
+// @supportURL   https://github.com/wuren194/Safari-/issues
 // ==/UserScript==
 
 (function () {

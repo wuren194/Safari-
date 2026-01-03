@@ -11,6 +11,9 @@
 // @grant        GM_registerMenuCommand
 // @connect      *
 // @run-at       document-end
+// @updateURL    https://raw.githubusercontent.com/wuren194/Safari-/main/LPSG%20%E5%A4%9A%E5%8A%9F%E8%83%BD%E5%B7%A5%E5%85%B7%E7%AE%B1%20%28v23.0%20%E6%92%AD%E6%94%BE%E5%99%A8%E4%BF%AE%E5%A4%8D%E7%89%88%29.user.js
+// @downloadURL  https://raw.githubusercontent.com/wuren194/Safari-/main/LPSG%20%E5%A4%9A%E5%8A%9F%E8%83%BD%E5%B7%A5%E5%85%B7%E7%AE%B1%20%28v23.0%20%E6%92%AD%E6%94%BE%E5%99%A8%E4%BF%AE%E5%A4%8D%E7%89%88%29.user.js
+// @supportURL   https://github.com/wuren194/Safari-/issues
 // ==/UserScript==
 
 (function () {

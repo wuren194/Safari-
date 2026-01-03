@@ -28,6 +28,9 @@
 // @connect      sleazyfork.org
 // @contributionURL https://www.buymeacoffee.com/hoothin
 // @contributionAmount 1
+// @updateURL    https://raw.githubusercontent.com/wuren194/Safari-/main/Greasyfork%20Search%20with%20Sleazyfork%20Results%20include.user.js
+// @downloadURL  https://raw.githubusercontent.com/wuren194/Safari-/main/Greasyfork%20Search%20with%20Sleazyfork%20Results%20include.user.js
+// @supportURL   https://github.com/wuren194/Safari-/issues
 // ==/UserScript==
 
 (function() {

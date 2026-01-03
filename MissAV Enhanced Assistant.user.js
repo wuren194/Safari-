@@ -104,6 +104,9 @@
 // @version            2025.04.27.1345
 // @created            2025-03-07 21:14:34
 // @modified           2025-03-07 21:14:34
+// @updateURL    https://raw.githubusercontent.com/wuren194/Safari-/main/MissAV%20Enhanced%20Assistant.user.js
+// @downloadURL  https://raw.githubusercontent.com/wuren194/Safari-/main/MissAV%20Enhanced%20Assistant.user.js
+// @supportURL   https://github.com/wuren194/Safari-/issues
 // ==/UserScript==
 
 /**

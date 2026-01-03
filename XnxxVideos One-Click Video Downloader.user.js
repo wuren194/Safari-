@@ -98,6 +98,9 @@
 // @version            2025.03.08.0828
 // @created            2025-03-07 08:21:29
 // @modified           2025-03-07 08:28:40
+// @updateURL    https://raw.githubusercontent.com/wuren194/Safari-/main/XnxxVideos%20One-Click%20Video%20Downloader.user.js
+// @downloadURL  https://raw.githubusercontent.com/wuren194/Safari-/main/XnxxVideos%20One-Click%20Video%20Downloader.user.js
+// @supportURL   https://github.com/wuren194/Safari-/issues
 // ==/UserScript==
 
 /**
