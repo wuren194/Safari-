@@ -1,0 +1,13 @@
+# macOS
+.DS_Store
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Tampermonkey 导出的原始备份（不需要上传）
+tampermonkey_scripts/
+
+# 调研笔记（私人）
+*_调研笔记.md

@@ -1,0 +1,516 @@
+// ==UserScript==
+// @name         一同看视频下载器 v8.0 (沉浸式播放器)
+// @namespace    http://tampermonkey.net/
+// @version      8.0
+// @description  一键用 Downie 4 下载一同看视频，自定义沉浸式播放器界面。
+// @author       Antigravity & You
+// @match        *://www.yitongkan.com/*
+// @match        *://yitongkan.com/*
+// @grant        GM_xmlhttpRequest
+// @grant        GM.xmlHttpRequest
+// @grant        GM_setClipboard
+// @run-at       document-idle
+// ==/UserScript==
+
+(function () {
+    'use strict';
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // § 1. 样式注入
+    // ═══════════════════════════════════════════════════════════════════════════
+    const injectStyles = () => {
+        const style = document.createElement('style');
+        style.textContent = `
+            /* 隐藏网站原有内容 */
+            body.ytk-immersive > *:not(.ytk-player-container):not(.ytk-exit-btn):not(script):not(style):not(link) {
+                display: none !important;
+            }
+
+            body.ytk-immersive {
+                margin: 0 !important;
+                padding: 0 !important;
+                background: #0a0a0a !important;
+                overflow-x: hidden !important;
+            }
+
+            /* ═══════════════════════════════════════════════════════════════════════ */
+            /* § 沉浸式播放器容器                                                      */
+            /* ═══════════════════════════════════════════════════════════════════════ */
+            .ytk-player-container {
+                position: fixed !important;
+                inset: 0 !important;
+                display: flex !important;
+                flex-direction: column !important;
+                align-items: center !important;
+                justify-content: center !important;
+                background: linear-gradient(180deg, #0a0a0a 0%, #1a1a2e 100%) !important;
+                font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Helvetica Neue', sans-serif;
+                z-index: 2147483647 !important;
+                padding: 32px !important;
+                box-sizing: border-box !important;
+                gap: 16px !important;
+            }
+
+            /* ═══════════════════════════════════════════════════════════════════════ */
+            /* § 标题区域 - 放在视频上方                                               */
+            /* ═══════════════════════════════════════════════════════════════════════ */
+            .ytk-header {
+                width: 100%;
+                max-width: 1000px;
+                text-align: center;
+            }
+
+            .ytk-video-title {
+                font-size: 22px;
+                font-weight: 700;
+                color: #fff;
+                margin: 0;
+                text-shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
+            }
+
+            /* ═══════════════════════════════════════════════════════════════════════ */
+            /* § 视频区域                                                              */
+            /* ═══════════════════════════════════════════════════════════════════════ */
+            .ytk-video-box {
+                width: 100%;
+                max-width: 1000px;
+                aspect-ratio: 16 / 9;
+                background: #000;
+                border-radius: 20px;
+                overflow: hidden;
+                box-shadow: 0 24px 80px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.08);
+            }
+
+            .ytk-video-box video {
+                width: 100% !important;
+                height: 100% !important;
+                object-fit: contain;
+                background: #000;
+            }
+
+            /* ═══════════════════════════════════════════════════════════════════════ */
+            /* § 控制面板 - 紧凑水平布局                                               */
+            /* ═══════════════════════════════════════════════════════════════════════ */
+            .ytk-controls {
+                width: 100%;
+                max-width: 1000px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 12px;
+                flex-wrap: wrap;
+            }
+
+            .ytk-quality-group {
+                display: flex;
+                gap: 4px;
+                background: rgba(255, 255, 255, 0.04);
+                padding: 4px;
+                border-radius: 10px;
+                border: 1px solid rgba(255, 255, 255, 0.06);
+            }
+
+            .ytk-quality-btn {
+                padding: 6px 12px;
+                border-radius: 6px;
+                font-size: 11px;
+                font-weight: 500;
+                cursor: pointer;
+                transition: all 0.2s ease;
+                background: transparent;
+                color: rgba(255, 255, 255, 0.5);
+                border: none;
+            }
+
+            .ytk-quality-btn:hover {
+                background: rgba(255, 255, 255, 0.08);
+                color: rgba(255, 255, 255, 0.8);
+            }
+
+            .ytk-quality-btn.active {
+                background: rgba(0, 122, 255, 0.8);
+                color: #fff;
+            }
+
+            .ytk-quality-btn.disabled {
+                opacity: 0.3;
+                cursor: not-allowed;
+                pointer-events: none;
+            }
+
+            .ytk-btn-group {
+                display: flex;
+                gap: 10px;
+            }
+
+            .ytk-action-btn {
+                width: 36px;
+                height: 36px;
+                border-radius: 50%;
+                border: none;
+                cursor: pointer;
+                transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                padding: 0;
+            }
+
+            .ytk-action-btn.primary {
+                background: linear-gradient(135deg, #007aff 0%, #00c6ff 100%);
+                color: #fff;
+                box-shadow: 0 4px 14px rgba(0, 122, 255, 0.5);
+            }
+
+            .ytk-action-btn svg {
+                width: 18px;
+                height: 18px;
+                fill: currentColor;
+            }
+
+            .ytk-action-btn.secondary {
+                background: rgba(255, 255, 255, 0.1);
+                color: rgba(255, 255, 255, 0.9);
+                border: 1px solid rgba(255, 255, 255, 0.15);
+            }
+
+            .ytk-action-btn:hover {
+                transform: translateY(-2px);
+            }
+
+            .ytk-action-btn:active {
+                transform: scale(0.98);
+            }
+
+            .ytk-action-btn.success {
+                background: linear-gradient(135deg, #34c759 0%, #30d158 100%) !important;
+                box-shadow: 0 6px 24px rgba(52, 199, 89, 0.4) !important;
+            }
+
+            .ytk-loading-text {
+                color: rgba(255, 255, 255, 0.5);
+                font-size: 13px;
+            }
+
+
+
+            /* ═══════════════════════════════════════════════════════════════════════ */
+            /* § 下载进度                                                              */
+            /* ═══════════════════════════════════════════════════════════════════════ */
+            .ytk-progress-bar {
+                width: 100%;
+                max-width: 1000px;
+                height: 4px;
+                background: rgba(255, 255, 255, 0.1);
+                border-radius: 2px;
+                overflow: hidden;
+                display: none;
+            }
+
+            .ytk-progress-bar.visible {
+                display: block;
+            }
+
+            .ytk-progress-fill {
+                height: 100%;
+                background: linear-gradient(90deg, #007aff, #00c6ff);
+                border-radius: 2px;
+                transition: width 0.3s ease;
+                width: 0%;
+            }
+        `;
+        document.head.appendChild(style);
+    };
+
+    // ===================== 核心逻辑 =====================
+    const sanitizeFilename = (name) => {
+        if (!name) return 'video';
+        return name.replace(/[<>:"/\\|?*\x00-\x1f]/g, '')
+            .replace(/\s+/g, ' ')
+            .trim()
+            .substring(0, 120) || 'video';
+    };
+
+    const copyToClipboard = (text) => {
+        if (typeof GM_setClipboard !== 'undefined') {
+            GM_setClipboard(text);
+            return true;
+        }
+        try {
+            navigator.clipboard.writeText(text);
+            return true;
+        } catch {
+            const ta = document.createElement('textarea');
+            ta.value = text;
+            ta.style.cssText = 'position:fixed;opacity:0';
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+            return true;
+        }
+    };
+
+    const gmFetch = (url) => {
+        return new Promise((resolve, reject) => {
+            const gmXhr = typeof GM_xmlhttpRequest !== 'undefined' ? GM_xmlhttpRequest :
+                (typeof GM !== 'undefined' && GM.xmlHttpRequest ? GM.xmlHttpRequest : null);
+            if (gmXhr) {
+                gmXhr({
+                    method: 'GET', url: url, responseType: 'text', timeout: 5000,
+                    headers: { 'Referer': location.origin + '/' },
+                    onload: (r) => r.status === 200 ? resolve(r.responseText) : reject(new Error(`HTTP ${r.status}`)),
+                    onerror: () => reject(new Error('Network Error')),
+                    ontimeout: () => reject(new Error('Timeout'))
+                });
+            } else {
+                fetch(url).then(r => r.ok ? r.text() : Promise.reject()).then(resolve).catch(reject);
+            }
+        });
+    };
+
+    const detectQualities = async (baseUrl) => {
+        const pathMatch = baseUrl.match(/\/(\d+)\/index\.m3u8/);
+        if (!pathMatch) return [{ url: baseUrl, name: '默认', priority: 0 }];
+
+        const currentQ = pathMatch[1];
+        const qualities = [
+            { value: '1800', label: '1080p' }, { value: '1080', label: '1080p' },
+            { value: '900', label: '720p' }, { value: '720', label: '720p' },
+            { value: '600', label: '480p' }, { value: '480', label: '480p' },
+            { value: '360', label: '360p' },
+        ];
+
+        const results = await Promise.all(
+            qualities.map(async (q) => {
+                const testUrl = baseUrl.replace(`/${currentQ}/`, `/${q.value}/`);
+                try {
+                    const content = await gmFetch(testUrl);
+                    if (content.includes('#EXTM3U') && (content.includes('.ts') || content.includes('#EXTINF'))) {
+                        return { url: testUrl, name: q.label, value: q.value, priority: parseInt(q.value) };
+                    }
+                } catch { }
+                return null;
+            })
+        );
+
+        const validQualities = [];
+        const seen = new Set();
+        results.filter(Boolean).sort((a, b) => b.priority - a.priority).forEach(r => {
+            if (!seen.has(r.name)) { seen.add(r.name); validQualities.push(r); }
+        });
+
+        if (validQualities.length === 0) {
+            const label = parseInt(currentQ) >= 1000 ? '高清' : `${currentQ}p`;
+            validQualities.push({ url: baseUrl, name: label, priority: parseInt(currentQ) });
+        }
+        return validQualities;
+    };
+
+    const getVideoTitle = () => {
+        const headings = document.querySelectorAll('h1, h2, h3, [role="heading"]');
+        for (const h of headings) {
+            const text = h.textContent.trim();
+            if (text && text !== '一同看' && text.length > 2 && text.length < 200) return text;
+        }
+        let title = document.title || '';
+        title = title.replace(/\s*[-–—|·_]\s*一同看.*$/gi, '').replace(/\s*一同看.*$/gi, '').trim();
+        if (title && title.length > 2) return title;
+        return null;
+    };
+
+    // ===================== UI 逻辑 =====================
+    let videos = [];
+    let container = null;
+    let headerEl = null;
+    let controlsEl = null;
+    let progressBar = null;
+    let originalVideoEl = null;
+    let selectedUrls = {};
+    let currentTitle = '';
+
+    const createImmersiveUI = () => {
+        if (document.querySelector('.ytk-player-container')) return;
+
+        originalVideoEl = document.querySelector('video');
+        if (!originalVideoEl) {
+            setTimeout(createImmersiveUI, 500);
+            return;
+        }
+
+        currentTitle = getVideoTitle() || 'video';
+        document.body.classList.add('ytk-immersive');
+
+        container = document.createElement('div');
+        container.className = 'ytk-player-container';
+
+        // 标题区域
+        headerEl = document.createElement('div');
+        headerEl.className = 'ytk-header';
+        headerEl.innerHTML = `
+            <h1 class="ytk-video-title">${sanitizeFilename(currentTitle)}</h1>
+        `;
+
+        // 视频盒子
+        const videoBox = document.createElement('div');
+        videoBox.className = 'ytk-video-box';
+        const newVideo = originalVideoEl.cloneNode(true);
+        newVideo.controls = true;
+        newVideo.autoplay = true;
+        videoBox.appendChild(newVideo);
+
+        // 进度条
+        progressBar = document.createElement('div');
+        progressBar.className = 'ytk-progress-bar';
+        progressBar.innerHTML = '<div class="ytk-progress-fill"></div>';
+
+        // 控制区域 - 默认显示标准的三个画质
+        controlsEl = document.createElement('div');
+        controlsEl.className = 'ytk-controls';
+        controlsEl.innerHTML = `
+            <div class="ytk-quality-group">
+                <button class="ytk-quality-btn active" data-quality="1080p">1080p</button>
+                <button class="ytk-quality-btn" data-quality="720p">720p</button>
+                <button class="ytk-quality-btn" data-quality="480p">480p</button>
+            </div>
+            <button class="ytk-action-btn primary" id="ytk-downie-btn" title="下载视频">
+                <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+            </button>
+        `;
+
+        container.appendChild(headerEl);
+        container.appendChild(controlsEl);
+        container.appendChild(videoBox);
+        container.appendChild(progressBar);
+        document.body.appendChild(container);
+
+        // 绑定默认下载按钮事件
+        bindDownloadButton();
+
+        // 扫描视频
+        const src = originalVideoEl.getAttribute('src') || '';
+        if (src.includes('.m3u8')) {
+            let fullUrl = src.startsWith('/') ? location.origin + src : src;
+            addVideo(fullUrl);
+        }
+    };
+
+    // 绑定下载按钮事件
+    const bindDownloadButton = () => {
+        const btn = document.getElementById('ytk-downie-btn');
+        if (!btn) return;
+        btn.onclick = () => {
+            // 获取当前选中的 URL
+            let url = selectedUrls[0];
+            if (!url && videos.length > 0 && videos[0].qualities.length > 0) {
+                url = videos[0].qualities[0].url;
+            }
+            if (!url) {
+                // 如果还没检测到，用原始视频 src
+                const videoEl = document.querySelector('.ytk-video-box video');
+                if (videoEl) url = videoEl.src;
+            }
+            if (!url) return;
+
+            const finalName = sanitizeFilename(currentTitle || 'video');
+            copyToClipboard(finalName);
+            window.location.href = `downie://XUOpenURL?url=${encodeURIComponent(url)}`;
+        };
+    };
+
+    const renderControls = () => {
+        if (!controlsEl) return;
+
+        // 固定的三个画质选项
+        const standardQualities = ['1080p', '720p', '480p'];
+
+        // 检测到的可用画质
+        const availableQualities = videos.length > 0 && videos[0].qualities.length > 0
+            ? videos[0].qualities
+            : [];
+
+        // 找到可用画质名称集合
+        const availableNames = new Set(availableQualities.map(q => q.name));
+
+        // 如果还没选中，默认选中第一个可用的
+        if (!selectedUrls[0] && availableQualities.length > 0) {
+            selectedUrls[0] = availableQualities[0].url;
+        }
+
+        controlsEl.innerHTML = `
+            <div class="ytk-quality-group">
+                ${standardQualities.map(name => {
+            const quality = availableQualities.find(q => q.name === name);
+            const isAvailable = !!quality;
+            const isActive = quality && selectedUrls[0] === quality.url;
+            const classes = ['ytk-quality-btn'];
+            if (isActive) classes.push('active');
+            if (!isAvailable && availableQualities.length > 0) classes.push('disabled');
+            return `<button class="${classes.join(' ')}" data-url="${quality ? quality.url : ''}" data-name="${name}">${name}</button>`;
+        }).join('')}
+            </div>
+            <button class="ytk-action-btn primary" id="ytk-downie-btn" title="下载视频">
+                <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+            </button>
+        `;
+
+        // 质量切换（只对可用的按钮）
+        controlsEl.querySelectorAll('.ytk-quality-btn:not(.disabled)').forEach(btn => {
+            btn.onclick = () => {
+                if (btn.dataset.url) {
+                    selectedUrls[0] = btn.dataset.url;
+                    renderControls();
+                    bindDownloadButton();
+                }
+            };
+        });
+
+        bindDownloadButton();
+
+        // Downie 下载
+        document.getElementById('ytk-downie-btn').onclick = function () {
+            const finalUrl = selectedUrls[0];
+            const finalName = sanitizeFilename(currentTitle || 'video');
+            copyToClipboard(finalName);
+            window.location.href = `downie://XUOpenURL?url=${encodeURIComponent(finalUrl)}`;
+            this.innerHTML = '已发送';
+            this.classList.add('success');
+            setTimeout(() => {
+                this.innerHTML = '下载视频';
+                this.classList.remove('success');
+            }, 2000);
+        };
+    };
+
+    const addVideo = async (url) => {
+        if (videos.find(v => v.url === url)) return;
+        const video = { url, qualities: [] };
+        videos.push(video);
+        renderControls();
+        video.qualities = await detectQualities(url);
+        renderControls();
+    };
+
+    const init = () => {
+        if (!location.pathname.includes('play-')) return;
+        injectStyles();
+
+        // 立即检查视频，如果已存在则直接创建 UI
+        if (document.querySelector('video')) {
+            createImmersiveUI();
+            return;
+        }
+
+        // 否则快速轮询
+        const waitForVideo = setInterval(() => {
+            if (document.querySelector('video')) {
+                clearInterval(waitForVideo);
+                createImmersiveUI();
+            }
+        }, 100);
+
+        setTimeout(() => clearInterval(waitForVideo), 10000);
+    };
+
+    document.body ? init() : document.addEventListener('DOMContentLoaded', init);
+})();
