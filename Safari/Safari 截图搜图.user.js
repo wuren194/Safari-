@@ -2,12 +2,18 @@
 // @name         Safari 截图搜图
 // @name:zh-CN   Safari 截图搜图
 // @namespace    http://tampermonkey.net/
-// @version      2.2.0
+// @version      2.3.0
 // @description  Safari 视频帧提取 + 图片拖拽识图（Google Lens + Yandex）- Liquid Glass UI
 // @author       Antigravity
 // @match        *://*/*
 // @match        https://www.google.com/imghp*
 // @match        https://www.google.com/search?*
+// @match        https://www.google.com.hk/imghp*
+// @match        https://www.google.com.hk/search?*
+// @match        https://www.google.co.jp/imghp*
+// @match        https://www.google.co.jp/search?*
+// @match        https://*.google.*/imghp*
+// @match        https://*.google.*/search?*
 // @exclude      *://localhost:*/*
 // @exclude      *://127.0.0.1:*/*
 // @compatible   safari
@@ -42,7 +48,7 @@
     const CONFIG = {
         DEBUG_MODE: false,
         PREFIX: 'sbi',
-        GOOGLE_DOMAINS: ['google.com', 'google.co.jp', 'google.com.hk', 'google.de'],
+        GOOGLE_DOMAINS: ['google.com', 'google.co.jp', 'google.com.hk', 'google.de', 'google.com.tw', 'google.co.uk', 'google.fr', 'google.ca'],
         AUTO_MODE_PARAM: 'sbi_auto=true',
         STORAGE_KEY_IMAGE: 'sbi_img_data',
         STORAGE_KEY_TIMESTAMP: 'sbi_timestamp',
