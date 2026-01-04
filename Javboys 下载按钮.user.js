@@ -193,8 +193,8 @@
         const title = sanitizeFilename(getTitle());
         copyToClipboard(title);
 
-        // 发送给 Downie
-        window.location.href = `downie://XUOpenURL?url=${encodeURIComponent(embedUrl)}`;
+        // 发送给 Downie（带标题参数）
+        window.location.href = `downie://XUOpenURL?url=${encodeURIComponent(embedUrl)}&title=${encodeURIComponent(title)}`;
 
         // 成功反馈
         btn.classList.remove('loading');
