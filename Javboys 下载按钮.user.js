@@ -178,8 +178,40 @@
         });
     }
 
+    // 从 URL 提取视频 ID
+    function extractVideoId(url) {
+        // doodstream/luluvdoo: https://luluvdoo.com/e/ft5s5y7h7t9c
+        const doodMatch = url.match(/\/e\/([a-zA-Z0-9]+)/);
+        if (doodMatch) return doodMatch[1];
+
+        // streamtape: https://streamtape.com/v/xxxx
+        const stMatch = url.match(/\/v\/([a-zA-Z0-9]+)/);
+        if (stMatch) return stMatch[1];
+
+        // 通用：最后一个路径段
+        const pathMatch = url.match(/\/([a-zA-Z0-9]+)\/?$/);
+        if (pathMatch) return pathMatch[1];
+
+        return null;
+    }
+
+    // 发送标题到本地服务
+    async function saveTitleToService(videoId, title) {
+        try {
+            await fetch('http://127.0.0.1:18080/add', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: videoId, title: title })
+            });
+            return true;
+        } catch (e) {
+            console.error('Failed to save title:', e);
+            return false;
+        }
+    }
+
     // 下载处理
-    function handleDownload(btn) {
+    async function handleDownload(btn) {
         btn.classList.add('loading');
 
         const embedUrl = findVideoEmbed();
@@ -191,15 +223,26 @@
         }
 
         const title = sanitizeFilename(getTitle());
+        const videoId = extractVideoId(embedUrl);
+
+        // 保存标题到本地服务
+        if (videoId) {
+            const saved = await saveTitleToService(videoId, title);
+            if (saved) {
+                showToast('标题已保存');
+            }
+        }
+
+        // 同时复制到剪贴板作为备用
         copyToClipboard(title);
 
-        // 发送给 Downie（带标题参数）
-        window.location.href = `downie://XUOpenURL?url=${encodeURIComponent(embedUrl)}&title=${encodeURIComponent(title)}`;
+        // 发送给 Downie
+        window.location.href = `downie://XUOpenURL?url=${encodeURIComponent(embedUrl)}`;
 
         // 成功反馈
         btn.classList.remove('loading');
         btn.classList.add('success');
-        showToast('已发送到 Downie，标题已复制');
+        showToast('已发送到 Downie');
 
         setTimeout(() => {
             btn.classList.remove('success');
