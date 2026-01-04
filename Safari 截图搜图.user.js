@@ -2,7 +2,7 @@
 // @name         Safari 截图搜图
 // @name:zh-CN   Safari 截图搜图
 // @namespace    http://tampermonkey.net/
-// @version      2.3.0
+// @version      2.4.0
 // @description  Safari 视频帧提取 + 图片拖拽识图（Google Lens + Yandex）- Liquid Glass UI
 // @author       Antigravity
 // @match        *://*/*
@@ -46,7 +46,7 @@
     // CONFIG - 静态配置
     // ============================================================
     const CONFIG = {
-        DEBUG_MODE: false,
+        DEBUG_MODE: true,
         PREFIX: 'sbi',
         GOOGLE_DOMAINS: ['google.com', 'google.co.jp', 'google.com.hk', 'google.de', 'google.com.tw', 'google.co.uk', 'google.fr', 'google.ca'],
         AUTO_MODE_PARAM: 'sbi_auto=true',
@@ -651,32 +651,56 @@
             toast.querySelector('.toast-text').textContent = '启动 Google Lens...';
             await GM.setValue(CONFIG.STORAGE_KEY_IMAGE, base64);
             await GM.setValue(CONFIG.STORAGE_KEY_TIMESTAMP, Date.now());
-            GM.openInTab(`https://www.google.com/imghp?hl=zh-CN&${CONFIG.AUTO_MODE_PARAM}`, { active: false });
+
+            // 使用 google.com.hk 避免重定向问题
+            const googleUrl = `https://www.google.com.hk/imghp?hl=zh-CN&${CONFIG.AUTO_MODE_PARAM}`;
+            Logger.info('打开 Google Lens:', googleUrl);
+            GM.openInTab(googleUrl, { active: false });
+
             await this.searchYandex(blob, toast);
             if (this.fab) this.fab.style.display = 'flex';
         },
 
         async searchYandex(blob, toast) {
+            Logger.info('开始 Yandex 搜索...');
+
+            // 设置总超时
+            const timeout = new Promise(resolve => setTimeout(() => resolve('timeout'), 15000));
+
             for (const host of CONFIG.YANDEX_HOSTS) {
                 toast.querySelector('.toast-text').textContent = `连接 ${host}...`;
+                Logger.debug('尝试 Yandex host:', host);
+
                 try {
-                    if (await this.yandexApiSearch(blob, host)) {
+                    const result = await Promise.race([this.yandexApiSearch(blob, host), timeout]);
+                    if (result === true) {
                         toast.querySelector('.toast-text').textContent = '识图完成！';
                         this.removeToast(toast);
                         return;
                     }
-                } catch { }
+                    if (result === 'timeout') {
+                        Logger.info('Yandex API 超时，尝试备用方案');
+                        break;
+                    }
+                } catch (e) {
+                    Logger.error('Yandex API 错误:', e);
+                }
+
                 try {
-                    const url = await this.uploadToCatbox(blob);
-                    if (url) {
-                        GM.openInTab(`https://${host}/images/search?rpt=imageview&url=${encodeURIComponent(url)}`, { active: true });
+                    Logger.debug('尝试 Catbox 上传...');
+                    const uploadResult = await Promise.race([this.uploadToCatbox(blob), timeout]);
+                    if (uploadResult && uploadResult !== 'timeout') {
+                        GM.openInTab(`https://${host}/images/search?rpt=imageview&url=${encodeURIComponent(uploadResult)}`, { active: true });
                         toast.querySelector('.toast-text').textContent = '识图完成！';
                         this.removeToast(toast);
                         return;
                     }
-                } catch { }
+                } catch (e) {
+                    Logger.error('Catbox 上传错误:', e);
+                }
             }
-            toast.querySelector('.toast-text').textContent = '通道拥挤，请手动上传';
+
+            toast.querySelector('.toast-text').textContent = '网络受限，请手动搜索';
             GM.openInTab('https://yandex.com/images/search?rpt=imageview', { active: true });
             this.removeToast(toast, 2000);
         },
