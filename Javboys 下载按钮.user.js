@@ -1,12 +1,15 @@
 // ==UserScript==
 // @name         Javboys 下载按钮
 // @namespace    http://tampermonkey.net/
-// @version      1.0
+// @version      1.1
 // @description  在 Javboys 视频页面添加 Downie 下载按钮
 // @author       Antigravity
 // @match        *://javboys.com/*
 // @match        *://www.javboys.com/*
 // @grant        GM_setClipboard
+// @grant        GM_xmlhttpRequest
+// @connect      127.0.0.1
+// @connect      localhost
 // @run-at       document-idle
 // @updateURL    https://raw.githubusercontent.com/wuren194/Safari-/main/Javboys%20%E4%B8%8B%E8%BD%BD%E6%8C%89%E9%92%AE.user.js
 // @downloadURL  https://raw.githubusercontent.com/wuren194/Safari-/main/Javboys%20%E4%B8%8B%E8%BD%BD%E6%8C%89%E9%92%AE.user.js
@@ -196,18 +199,26 @@
     }
 
     // 发送标题到本地服务
-    async function saveTitleToService(videoId, title) {
-        try {
-            await fetch('http://127.0.0.1:18080/add', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ id: videoId, title: title })
-            });
-            return true;
-        } catch (e) {
-            console.error('Failed to save title:', e);
-            return false;
-        }
+    function saveTitleToService(videoId, title) {
+        return new Promise((resolve) => {
+            if (typeof GM_xmlhttpRequest !== 'undefined') {
+                GM_xmlhttpRequest({
+                    method: 'POST',
+                    url: 'http://127.0.0.1:18080/add',
+                    headers: { 'Content-Type': 'application/json' },
+                    data: JSON.stringify({ id: videoId, title: title }),
+                    onload: () => resolve(true),
+                    onerror: () => resolve(false)
+                });
+            } else {
+                // Fallback to fetch
+                fetch('http://127.0.0.1:18080/add', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id: videoId, title: title })
+                }).then(() => resolve(true)).catch(() => resolve(false));
+            }
+        });
     }
 
     // 下载处理

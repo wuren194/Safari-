@@ -7,7 +7,7 @@
     <key>ProgramArguments</key>
     <array>
         <string>/usr/bin/python3</string>
-        <string>/Users/jiangxiaoxuan/Desktop/工具/脚本/downie_title_service.py</string>
+        <string>/Users/jiangxiaoxuan/.local/bin/downie_title_service.py</string>
     </array>
     <key>RunAtLoad</key>
     <true/>
