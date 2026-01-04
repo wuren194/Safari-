@@ -2,7 +2,7 @@
 // @name         Safari 截图搜图
 // @name:zh-CN   Safari 截图搜图
 // @namespace    http://tampermonkey.net/
-// @version      2.1.0
+// @version      2.2.0
 // @description  Safari 视频帧提取 + 图片拖拽识图（Google Lens + Yandex）- Liquid Glass UI
 // @author       Antigravity
 // @match        *://*/*
@@ -728,22 +728,68 @@
                 await GM.deleteValue(CONFIG.STORAGE_KEY_IMAGE);
 
                 const file = new File([Utils.dataUrlToBlob(base64)], 'frame.jpg', { type: 'image/jpeg' });
+                let clickAttempts = 0;
+                let fileUploaded = false;
+
                 const loop = setInterval(() => {
-                    const input = document.querySelector('input[type="file"]');
+                    if (fileUploaded) return;
+
+                    // 尝试多种选择器找到文件输入框
+                    const input = document.querySelector('input[type="file"][name="encoded_image"]') ||
+                        document.querySelector('input[type="file"]');
+
                     if (input) {
-                        clearInterval(loop);
-                        const dt = new DataTransfer();
-                        dt.items.add(file);
-                        input.files = dt.files;
-                        input.dispatchEvent(new Event('change', { bubbles: true }));
-                        toast.querySelector('.toast-text').textContent = '识图已启动';
-                        this.removeToast(toast);
+                        try {
+                            const dt = new DataTransfer();
+                            dt.items.add(file);
+                            input.files = dt.files;
+                            input.dispatchEvent(new Event('change', { bubbles: true }));
+                            input.dispatchEvent(new Event('input', { bubbles: true }));
+                            fileUploaded = true;
+                            clearInterval(loop);
+                            toast.querySelector('.toast-text').textContent = '识图已启动';
+                            this.removeToast(toast);
+                            Logger.info('Google Lens 文件注入成功');
+                        } catch (err) {
+                            Logger.error('文件注入失败:', err);
+                        }
                     } else {
-                        document.querySelector('[aria-label*="Search by image"], [aria-label*="按图搜索"], .nDcEnd')?.click();
+                        // 尝试点击相机按钮打开上传对话框
+                        const cameraBtn = document.querySelector('div.nDcEnd[role="button"]') ||
+                            document.querySelector('[aria-label="按图搜索"]') ||
+                            document.querySelector('[aria-label="Search by image"]') ||
+                            document.querySelector('[aria-label*="图片"]') ||
+                            document.querySelector('.nDcEnd') ||
+                            document.querySelector('[data-ved] svg')?.closest('[role="button"]');
+
+                        if (cameraBtn && clickAttempts < 10) {
+                            cameraBtn.click();
+                            clickAttempts++;
+                            Logger.debug('点击相机按钮, 尝试次数:', clickAttempts);
+                        }
+
+                        // 也尝试点击 "上传文件" 按钮（如果对话框已打开）
+                        const uploadBtn = document.querySelector('span.DV7the[role="button"]') ||
+                            Array.from(document.querySelectorAll('span[role="button"]'))
+                                .find(el => el.textContent.includes('上传') || el.textContent.includes('Upload'));
+                        if (uploadBtn) {
+                            uploadBtn.click();
+                            Logger.debug('点击上传按钮');
+                        }
                     }
-                }, 800);
-                setTimeout(() => clearInterval(loop), 15000);
-            } catch {
+                }, 500);
+
+                // 20秒超时
+                setTimeout(() => {
+                    if (!fileUploaded) {
+                        clearInterval(loop);
+                        toast.querySelector('.toast-text').textContent = '注入超时，请手动上传';
+                        this.removeToast(toast, 3000);
+                        Logger.error('Google Lens 注入超时');
+                    }
+                }, 20000);
+            } catch (err) {
+                Logger.error('Google Lens 注入异常:', err);
                 toast.querySelector('.toast-text').textContent = '注入失败';
                 this.removeToast(toast, 2000);
             }
