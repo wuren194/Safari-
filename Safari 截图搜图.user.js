@@ -769,22 +769,3 @@
         setTimeout(init, 500);
     }
 })();
-// ==UserScript==
-// @name         New Userscript
-// @namespace    http://tampermonkey.net/
-// @version      2025-12-29
-// @description  try to take over the world!
-// @author       You
-// @match        https://thisvid.com/playlist/351885/video/muscular-trainer-gets-deep-dicked-by-his-skinny-client/
-// @icon         http://thisvid.com/favicon.ico
-// @grant        none
-// @updateURL    https://raw.githubusercontent.com/wuren194/Safari-/main/Safari%20%E6%88%AA%E5%9B%BE%E6%90%9C%E5%9B%BE.user.js
-// @downloadURL  https://raw.githubusercontent.com/wuren194/Safari-/main/Safari%20%E6%88%AA%E5%9B%BE%E6%90%9C%E5%9B%BE.user.js
-// @supportURL   https://github.com/wuren194/Safari-/issues
-// ==/UserScript==
-
-(function() {
-    'use strict';
-
-    // Your code here...
-})();
