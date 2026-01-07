@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         iGay69 Google Drive Extractor (Liquid Glass)
 // @namespace    http://tampermonkey.net/
-// @version      2.6
+// @version      2.7
 // @description  批量提取 iGay69 页面的 Google Drive 下载链接并直接下载 - Liquid Glass UI
 // @author       Antigravity
 // @match        https://igay69.com/*
@@ -590,32 +590,76 @@
             box-shadow: 0 4px 15px rgba(10, 132, 255, 0.4);
         }
         .btn-download:hover { transform: translateY(-2px); filter: brightness(1.1); }
+        .btn-open {
+            background: #34c759; color: white;
+            box-shadow: 0 4px 15px rgba(52, 199, 89, 0.4);
+        }
+        .btn-open:hover { transform: translateY(-2px); filter: brightness(1.1); }
         .btn-view { background: rgba(255, 255, 255, 0.1); color: white; }
         .btn-view:hover { background: rgba(255, 255, 255, 0.2); }
-        .header-actions { text-align: center; margin-bottom: 30px; }
+        .header-actions { text-align: center; margin-bottom: 30px; display: flex; justify-content: center; gap: 16px; flex-wrap: wrap; }
         .btn-all { padding: 15px 40px; font-size: 16px; }
+        .status { text-align: center; margin-bottom: 20px; padding: 12px; background: rgba(255,255,255,0.1); border-radius: 8px; display: none; }
+        .tip { text-align: center; margin-bottom: 20px; font-size: 14px; color: rgba(255,255,255,0.6); }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>🔥 iGay69 下载助手</h1>
+        <div class="tip">💡 提示：点击"全部打开新标签"后，脚本会自动在每个标签页点击"仍然下载"按钮</div>
+        <div class="status" id="status"></div>
         <div class="header-actions">
-            <a href="#" class="btn btn-download btn-all" onclick="downloadAll(); return false;">📥 下载全部 (${extractedLinks.length} 个文件)</a>
+            <a href="#" class="btn btn-open btn-all" onclick="openAllTabs(); return false;">🚀 全部打开新标签 (${extractedLinks.length} 个)</a>
+            <a href="#" class="btn btn-download btn-all" onclick="copyAllLinks(); return false;">📋 复制全部链接</a>
         </div>
         ${extractedLinks.map((link, i) => `
             <div class="link-card">
                 <span class="link-title">${i + 1}. ${link.title}</span>
                 <div class="link-actions">
                     <a href="${link.shareUrl}" target="_blank" class="btn btn-view">👁 查看</a>
-                    <a href="${link.downloadUrl}" class="btn btn-download" download>📥 下载</a>
+                    <a href="${link.downloadUrl}" target="_blank" class="btn btn-download">📥 下载</a>
                 </div>
             </div>
         `).join('')}
     </div>
     <script>
-        function downloadAll() {
-            const links = ${JSON.stringify(extractedLinks.map(l => l.downloadUrl))};
-            links.forEach((url, i) => { setTimeout(() => window.open(url, '_blank'), i * 500); });
+        const links = ${JSON.stringify(extractedLinks.map(l => l.downloadUrl))};
+        const statusEl = document.getElementById('status');
+        
+        function showStatus(msg) {
+            statusEl.style.display = 'block';
+            statusEl.textContent = msg;
+        }
+        
+        function openAllTabs() {
+            showStatus('正在打开全部链接... 请允许弹窗权限');
+            let opened = 0;
+            links.forEach((url, i) => {
+                setTimeout(() => {
+                    window.open(url, '_blank');
+                    opened++;
+                    showStatus('已打开 ' + opened + '/' + links.length + ' 个标签页...');
+                    if (opened === links.length) {
+                        showStatus('✅ 全部已打开！脚本会自动帮你点击"仍然下载"');
+                    }
+                }, i * 600);
+            });
+        }
+        
+        function copyAllLinks() {
+            const text = links.join('\\n');
+            navigator.clipboard.writeText(text).then(() => {
+                showStatus('✅ 已复制 ' + links.length + ' 个链接到剪贴板！');
+            }).catch(() => {
+                // 降级方案
+                const ta = document.createElement('textarea');
+                ta.value = text;
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+                showStatus('✅ 已复制 ' + links.length + ' 个链接到剪贴板！');
+            });
         }
     </script>
 </body>
