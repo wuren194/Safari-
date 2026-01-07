@@ -1,12 +1,17 @@
 // ==UserScript==
 // @name         iGay69 Google Drive Extractor (Liquid Glass)
 // @namespace    http://tampermonkey.net/
-// @version      2.4
+// @version      2.5
 // @description  批量提取 iGay69 页面的 Google Drive 下载链接并直接下载 - Liquid Glass UI
 // @author       Antigravity
 // @match        https://igay69.com/*
 // @match        https://drive.google.com/*
 // @match        https://drive.usercontent.google.com/*
+// @match        *://drive.usercontent.google.com/*
+// @include      https://drive.google.com/*
+// @include      https://drive.usercontent.google.com/*
+// @include      *://*.google.com/download*
+// @include      *://*.google.com/uc*
 // @grant        GM_xmlhttpRequest
 // @grant        GM_download
 // @grant        GM_addStyle
