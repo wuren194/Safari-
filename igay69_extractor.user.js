@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         iGay69 Google Drive Extractor (Liquid Glass)
 // @namespace    http://tampermonkey.net/
-// @version      2.0
+// @version      2.1
 // @description  批量提取 iGay69 页面的 Google Drive 下载链接并直接下载 - Liquid Glass UI
 // @author       Antigravity
 // @match        https://igay69.com/*
@@ -518,23 +518,32 @@
             return;
         }
 
-        updateStatus(`正在尝试下载 ${extractedLinks.length} 个文件...`);
+        updateStatus(`正在触发下载 ${extractedLinks.length} 个文件...`);
+
+        // 方法1: 使用隐藏的 a 标签模拟点击下载
+        // 这是 Safari 中最可靠的方式
+        const downloadViaAnchor = (url, filename, index) => {
+            setTimeout(() => {
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                a.style.display = 'none';
+                a.target = '_blank';
+                a.rel = 'noopener noreferrer';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                updateStatus(`下载进度: ${index + 1}/${extractedLinks.length}`);
+            }, index * 800); // 间隔 800ms 避免被拦截
+        };
 
         extractedLinks.forEach((link, index) => {
-            setTimeout(() => {
-                if (typeof GM_download !== 'undefined') {
-                    GM_download({
-                        url: link.downloadUrl,
-                        name: link.title + '.zip',
-                        onerror: () => window.open(link.downloadUrl, '_blank')
-                    });
-                } else {
-                    window.open(link.downloadUrl, '_blank');
-                }
-            }, index * 500);
+            downloadViaAnchor(link.downloadUrl, link.title + '.zip', index);
         });
 
-        updateStatus(`已触发 ${extractedLinks.length} 个下载任务`);
+        setTimeout(() => {
+            updateStatus(`✅ 已触发 ${extractedLinks.length} 个下载，请检查浏览器下载列表或允许弹窗`);
+        }, extractedLinks.length * 800 + 500);
     };
 
     const openDownloadPage = () => {
