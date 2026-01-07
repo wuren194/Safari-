@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         iGay69 Google Drive Extractor (Liquid Glass)
 // @namespace    http://tampermonkey.net/
-// @version      2.9
+// @version      3.0
 // @description  批量提取 iGay69 页面的 Google Drive 下载链接并直接下载 - Liquid Glass UI
 // @author       Antigravity
 // @match        https://igay69.com/*
@@ -598,7 +598,7 @@
         html += '  e.preventDefault();';
         html += '  showStatus("正在打开全部链接...");';
         html += '  var opened = 0;';
-        html += '  for (var i = 0; i < links.length; i++) {';
+        html += '  var i = 0; while (i !== links.length) {';
         html += '    (function(url, idx) {';
         html += '      setTimeout(function() {';
         html += '        window.open(url, "_blank");';
@@ -606,6 +606,7 @@
         html += '        showStatus("已打开 " + opened + "/" + links.length + " 个标签页");';
         html += '      }, idx * 600);';
         html += '    })(links[i], i);';
+        html += '    i++;';
         html += '  }';
         html += '};';
         html += 'document.getElementById("copyBtn").onclick = function(e) {';
