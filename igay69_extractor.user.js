@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         iGay69 Google Drive Extractor (Liquid Glass)
 // @namespace    http://tampermonkey.net/
-// @version      2.8
+// @version      2.9
 // @description  批量提取 iGay69 页面的 Google Drive 下载链接并直接下载 - Liquid Glass UI
 // @author       Antigravity
 // @match        https://igay69.com/*
@@ -541,130 +541,81 @@
             return;
         }
 
-        const html = `
-<!DOCTYPE html>
-<html>
-<head>
-    <title>iGay69 下载助手</title>
-    <meta charset="utf-8">
-    <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-            min-height: 100vh;
-            padding: 40px;
-            color: white;
+        // 构建链接列表 HTML
+        let linksHtml = '';
+        for (let i = 0; i < extractedLinks.length; i++) {
+            const link = extractedLinks[i];
+            linksHtml += '<div class="link-card"><span class="link-title">' + (i + 1) + '. ' + link.title.replace(/'/g, "\\'") + '</span>' +
+                '<div class="link-actions">' +
+                '<a href="' + link.shareUrl + '" target="_blank" class="btn btn-view">查看</a>' +
+                '<a href="' + link.downloadUrl + '" target="_blank" class="btn btn-download">下载</a>' +
+                '</div></div>';
         }
-        h1 {
-            text-align: center;
-            margin-bottom: 30px;
-            font-size: 28px;
-            background: linear-gradient(135deg, #0a84ff 0%, #5ac8fa 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+
+        // 构建下载链接数组的 JSON
+        const downloadUrls = [];
+        for (let i = 0; i < extractedLinks.length; i++) {
+            downloadUrls.push(extractedLinks[i].downloadUrl);
         }
-        .container { max-width: 800px; margin: 0 auto; }
-        .link-card {
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 16px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 20px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            transition: all 0.2s;
-        }
-        .link-card:hover { background: rgba(255, 255, 255, 0.08); transform: translateX(5px); }
-        .link-title { flex: 1; font-size: 16px; font-weight: 500; }
-        .link-actions { display: flex; gap: 10px; }
-        .btn {
-            padding: 10px 20px; border: none; border-radius: 8px;
-            cursor: pointer; font-weight: 600; font-size: 14px;
-            text-decoration: none; transition: all 0.2s;
-        }
-        .btn-download {
-            background: #0a84ff; color: white;
-            box-shadow: 0 4px 15px rgba(10, 132, 255, 0.4);
-        }
-        .btn-download:hover { transform: translateY(-2px); filter: brightness(1.1); }
-        .btn-open {
-            background: #34c759; color: white;
-            box-shadow: 0 4px 15px rgba(52, 199, 89, 0.4);
-        }
-        .btn-open:hover { transform: translateY(-2px); filter: brightness(1.1); }
-        .btn-view { background: rgba(255, 255, 255, 0.1); color: white; }
-        .btn-view:hover { background: rgba(255, 255, 255, 0.2); }
-        .header-actions { text-align: center; margin-bottom: 30px; display: flex; justify-content: center; gap: 16px; flex-wrap: wrap; }
-        .btn-all { padding: 15px 40px; font-size: 16px; }
-        .status { text-align: center; margin-bottom: 20px; padding: 12px; background: rgba(255,255,255,0.1); border-radius: 8px; display: none; }
-        .tip { text-align: center; margin-bottom: 20px; font-size: 14px; color: rgba(255,255,255,0.6); }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>🔥 iGay69 下载助手</h1>
-        <div class="tip">💡 提示：点击"全部打开新标签"后，脚本会自动在每个标签页点击"仍然下载"按钮</div>
-        <div class="status" id="status"></div>
-        <div class="header-actions">
-            <a href="#" class="btn btn-open btn-all" onclick="openAllTabs(); return false;">🚀 全部打开新标签 (${extractedLinks.length} 个)</a>
-            <a href="#" class="btn btn-download btn-all" onclick="copyAllLinks(); return false;">📋 复制全部链接</a>
-        </div>
-        ${extractedLinks.map((link, i) => `
-            <div class="link-card">
-                <span class="link-title">${i + 1}. ${link.title}</span>
-                <div class="link-actions">
-                    <a href="${link.shareUrl}" target="_blank" class="btn btn-view">👁 查看</a>
-                    <a href="${link.downloadUrl}" target="_blank" class="btn btn-download">📥 下载</a>
-                </div>
-            </div>
-        `).join('')}
-    </div>
-    <script>
-        const links = ${JSON.stringify(extractedLinks.map(l => l.downloadUrl))};
-        const statusEl = document.getElementById('status');
-        
-        function showStatus(msg) {
-            statusEl.style.display = 'block';
-            statusEl.textContent = msg;
-        }
-        
-        function openAllTabs() {
-            showStatus('正在打开全部链接... 请允许弹窗权限');
-            let opened = 0;
-            links.forEach((url, i) => {
-                setTimeout(() => {
-                    window.open(url, '_blank');
-                    opened++;
-                    showStatus('已打开 ' + opened + '/' + links.length + ' 个标签页...');
-                    if (opened === links.length) {
-                        showStatus('✅ 全部已打开！脚本会自动帮你点击"仍然下载"');
-                    }
-                }, i * 600);
-            });
-        }
-        
-        function copyAllLinks() {
-            const text = links.join('\\n');
-            navigator.clipboard.writeText(text).then(() => {
-                showStatus('✅ 已复制 ' + links.length + ' 个链接到剪贴板！');
-            }).catch(() => {
-                // 降级方案
-                const ta = document.createElement('textarea');
-                ta.value = text;
-                document.body.appendChild(ta);
-                ta.select();
-                document.execCommand('copy');
-                document.body.removeChild(ta);
-                showStatus('✅ 已复制 ' + links.length + ' 个链接到剪贴板！');
-            });
-        }
-    </script>
-</body>
-</html>
-        `;
+        const linksJson = JSON.stringify(downloadUrls);
+
+        // 构建完整 HTML - 使用单引号和字符串拼接避免转义问题
+        let html = '';
+        html += '<!DOCTYPE html><html><head><title>iGay69 下载助手</title><meta charset="utf-8">';
+        html += '<style>';
+        html += '* { box-sizing: border-box; margin: 0; padding: 0; }';
+        html += 'body { font-family: -apple-system, sans-serif; background: linear-gradient(135deg, #1a1a2e, #16213e); min-height: 100vh; padding: 40px; color: white; }';
+        html += 'h1 { text-align: center; margin-bottom: 20px; font-size: 28px; color: #0a84ff; }';
+        html += '.container { max-width: 800px; margin: 0 auto; }';
+        html += '.tip { text-align: center; margin-bottom: 20px; font-size: 14px; color: rgba(255,255,255,0.6); }';
+        html += '.status { text-align: center; margin-bottom: 20px; padding: 12px; background: rgba(255,255,255,0.1); border-radius: 8px; display: none; }';
+        html += '.header-actions { text-align: center; margin-bottom: 30px; display: flex; justify-content: center; gap: 16px; flex-wrap: wrap; }';
+        html += '.link-card { background: rgba(255,255,255,0.05); border-radius: 12px; padding: 20px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; gap: 20px; border: 1px solid rgba(255,255,255,0.1); }';
+        html += '.link-card:hover { background: rgba(255,255,255,0.08); }';
+        html += '.link-title { flex: 1; font-size: 16px; font-weight: 500; }';
+        html += '.link-actions { display: flex; gap: 10px; }';
+        html += '.btn { padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 14px; text-decoration: none; }';
+        html += '.btn-download { background: #0a84ff; color: white; }';
+        html += '.btn-open { background: #34c759; color: white; }';
+        html += '.btn-view { background: rgba(255,255,255,0.1); color: white; }';
+        html += '.btn-all { padding: 15px 40px; font-size: 16px; }';
+        html += '</style></head><body>';
+        html += '<div class="container">';
+        html += '<h1>iGay69 下载助手</h1>';
+        html += '<div class="tip">提示: 点击全部打开新标签后，脚本会自动点击仍然下载按钮</div>';
+        html += '<div class="status" id="status"></div>';
+        html += '<div class="header-actions">';
+        html += '<a href="#" class="btn btn-open btn-all" id="openAllBtn">全部打开新标签 (' + extractedLinks.length + ' 个)</a>';
+        html += '<a href="#" class="btn btn-download btn-all" id="copyBtn">复制全部链接</a>';
+        html += '</div>';
+        html += linksHtml;
+        html += '</div>';
+        html += '<script>';
+        html += 'var links = ' + linksJson + ';';
+        html += 'var statusEl = document.getElementById("status");';
+        html += 'function showStatus(msg) { statusEl.style.display = "block"; statusEl.textContent = msg; }';
+        html += 'document.getElementById("openAllBtn").onclick = function(e) {';
+        html += '  e.preventDefault();';
+        html += '  showStatus("正在打开全部链接...");';
+        html += '  var opened = 0;';
+        html += '  for (var i = 0; i < links.length; i++) {';
+        html += '    (function(url, idx) {';
+        html += '      setTimeout(function() {';
+        html += '        window.open(url, "_blank");';
+        html += '        opened++;';
+        html += '        showStatus("已打开 " + opened + "/" + links.length + " 个标签页");';
+        html += '      }, idx * 600);';
+        html += '    })(links[i], i);';
+        html += '  }';
+        html += '};';
+        html += 'document.getElementById("copyBtn").onclick = function(e) {';
+        html += '  e.preventDefault();';
+        html += '  var text = links.join("\\n");';
+        html += '  navigator.clipboard.writeText(text).then(function() {';
+        html += '    showStatus("已复制 " + links.length + " 个链接!");';
+        html += '  });';
+        html += '};';
+        html += '<\/script></body></html>';
 
         const blob = new Blob([html], { type: 'text/html' });
         const url = URL.createObjectURL(blob);
