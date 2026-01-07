@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         iGay69 Google Drive Extractor (Liquid Glass)
 // @namespace    http://tampermonkey.net/
-// @version      3.0
+// @version      3.1
 // @description  批量提取 iGay69 页面的 Google Drive 下载链接并直接下载 - Liquid Glass UI
 // @author       Antigravity
 // @match        https://igay69.com/*
@@ -541,86 +541,84 @@
             return;
         }
 
-        // 构建链接列表 HTML
-        let linksHtml = '';
+        // 打开新窗口并直接写入内容
+        const newWin = window.open('', '_blank');
+        if (!newWin) {
+            alert('无法打开新窗口，请允许弹窗');
+            return;
+        }
+
+        const doc = newWin.document;
+        doc.write('<!DOCTYPE html><html><head><title>iGay69 下载助手</title><meta charset="utf-8">');
+        doc.write('<style>');
+        doc.write('* { box-sizing: border-box; margin: 0; padding: 0; }');
+        doc.write('body { font-family: -apple-system, sans-serif; background: linear-gradient(135deg, #1a1a2e, #16213e); min-height: 100vh; padding: 40px; color: white; }');
+        doc.write('h1 { text-align: center; margin-bottom: 20px; font-size: 28px; color: #0a84ff; }');
+        doc.write('.container { max-width: 800px; margin: 0 auto; }');
+        doc.write('.tip { text-align: center; margin-bottom: 20px; font-size: 14px; color: rgba(255,255,255,0.6); }');
+        doc.write('.status { text-align: center; margin-bottom: 20px; padding: 12px; background: rgba(255,255,255,0.1); border-radius: 8px; display: none; }');
+        doc.write('.header-actions { text-align: center; margin-bottom: 30px; display: flex; justify-content: center; gap: 16px; flex-wrap: wrap; }');
+        doc.write('.link-card { background: rgba(255,255,255,0.05); border-radius: 12px; padding: 20px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; gap: 20px; border: 1px solid rgba(255,255,255,0.1); }');
+        doc.write('.link-card:hover { background: rgba(255,255,255,0.08); }');
+        doc.write('.link-title { flex: 1; font-size: 16px; font-weight: 500; }');
+        doc.write('.link-actions { display: flex; gap: 10px; }');
+        doc.write('.btn { padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 14px; text-decoration: none; }');
+        doc.write('.btn-download { background: #0a84ff; color: white; }');
+        doc.write('.btn-open { background: #34c759; color: white; }');
+        doc.write('.btn-view { background: rgba(255,255,255,0.1); color: white; }');
+        doc.write('.btn-all { padding: 15px 40px; font-size: 16px; }');
+        doc.write('</style></head><body>');
+        doc.write('<div class="container">');
+        doc.write('<h1>iGay69 下载助手</h1>');
+        doc.write('<div class="tip">提示: 点击全部打开新标签后，脚本会自动点击仍然下载按钮</div>');
+        doc.write('<div class="status" id="status"></div>');
+        doc.write('<div class="header-actions">');
+        doc.write('<button class="btn btn-open btn-all" id="openAllBtn">全部打开新标签 (' + extractedLinks.length + ' 个)</button>');
+        doc.write('<button class="btn btn-download btn-all" id="copyBtn">复制全部链接</button>');
+        doc.write('</div>');
+
+        // 写入链接卡片
         for (let i = 0; i < extractedLinks.length; i++) {
             const link = extractedLinks[i];
-            linksHtml += '<div class="link-card"><span class="link-title">' + (i + 1) + '. ' + link.title.replace(/'/g, "\\'") + '</span>' +
-                '<div class="link-actions">' +
-                '<a href="' + link.shareUrl + '" target="_blank" class="btn btn-view">查看</a>' +
-                '<a href="' + link.downloadUrl + '" target="_blank" class="btn btn-download">下载</a>' +
-                '</div></div>';
+            const safeTitle = link.title.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+            doc.write('<div class="link-card">');
+            doc.write('<span class="link-title">' + (i + 1) + '. ' + safeTitle + '</span>');
+            doc.write('<div class="link-actions">');
+            doc.write('<a href="' + link.shareUrl + '" target="_blank" class="btn btn-view">查看</a>');
+            doc.write('<a href="' + link.downloadUrl + '" target="_blank" class="btn btn-download">下载</a>');
+            doc.write('</div></div>');
         }
 
-        // 构建下载链接数组的 JSON
-        const downloadUrls = [];
-        for (let i = 0; i < extractedLinks.length; i++) {
-            downloadUrls.push(extractedLinks[i].downloadUrl);
-        }
-        const linksJson = JSON.stringify(downloadUrls);
+        doc.write('</div></body></html>');
+        doc.close();
 
-        // 构建完整 HTML - 使用单引号和字符串拼接避免转义问题
-        let html = '';
-        html += '<!DOCTYPE html><html><head><title>iGay69 下载助手</title><meta charset="utf-8">';
-        html += '<style>';
-        html += '* { box-sizing: border-box; margin: 0; padding: 0; }';
-        html += 'body { font-family: -apple-system, sans-serif; background: linear-gradient(135deg, #1a1a2e, #16213e); min-height: 100vh; padding: 40px; color: white; }';
-        html += 'h1 { text-align: center; margin-bottom: 20px; font-size: 28px; color: #0a84ff; }';
-        html += '.container { max-width: 800px; margin: 0 auto; }';
-        html += '.tip { text-align: center; margin-bottom: 20px; font-size: 14px; color: rgba(255,255,255,0.6); }';
-        html += '.status { text-align: center; margin-bottom: 20px; padding: 12px; background: rgba(255,255,255,0.1); border-radius: 8px; display: none; }';
-        html += '.header-actions { text-align: center; margin-bottom: 30px; display: flex; justify-content: center; gap: 16px; flex-wrap: wrap; }';
-        html += '.link-card { background: rgba(255,255,255,0.05); border-radius: 12px; padding: 20px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; gap: 20px; border: 1px solid rgba(255,255,255,0.1); }';
-        html += '.link-card:hover { background: rgba(255,255,255,0.08); }';
-        html += '.link-title { flex: 1; font-size: 16px; font-weight: 500; }';
-        html += '.link-actions { display: flex; gap: 10px; }';
-        html += '.btn { padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 14px; text-decoration: none; }';
-        html += '.btn-download { background: #0a84ff; color: white; }';
-        html += '.btn-open { background: #34c759; color: white; }';
-        html += '.btn-view { background: rgba(255,255,255,0.1); color: white; }';
-        html += '.btn-all { padding: 15px 40px; font-size: 16px; }';
-        html += '</style></head><body>';
-        html += '<div class="container">';
-        html += '<h1>iGay69 下载助手</h1>';
-        html += '<div class="tip">提示: 点击全部打开新标签后，脚本会自动点击仍然下载按钮</div>';
-        html += '<div class="status" id="status"></div>';
-        html += '<div class="header-actions">';
-        html += '<a href="#" class="btn btn-open btn-all" id="openAllBtn">全部打开新标签 (' + extractedLinks.length + ' 个)</a>';
-        html += '<a href="#" class="btn btn-download btn-all" id="copyBtn">复制全部链接</a>';
-        html += '</div>';
-        html += linksHtml;
-        html += '</div>';
-        html += '<script>';
-        html += 'var links = ' + linksJson + ';';
-        html += 'var statusEl = document.getElementById("status");';
-        html += 'function showStatus(msg) { statusEl.style.display = "block"; statusEl.textContent = msg; }';
-        html += 'document.getElementById("openAllBtn").onclick = function(e) {';
-        html += '  e.preventDefault();';
-        html += '  showStatus("正在打开全部链接...");';
-        html += '  var opened = 0;';
-        html += '  var i = 0; while (i !== links.length) {';
-        html += '    (function(url, idx) {';
-        html += '      setTimeout(function() {';
-        html += '        window.open(url, "_blank");';
-        html += '        opened++;';
-        html += '        showStatus("已打开 " + opened + "/" + links.length + " 个标签页");';
-        html += '      }, idx * 600);';
-        html += '    })(links[i], i);';
-        html += '    i++;';
-        html += '  }';
-        html += '};';
-        html += 'document.getElementById("copyBtn").onclick = function(e) {';
-        html += '  e.preventDefault();';
-        html += '  var text = links.join("\\n");';
-        html += '  navigator.clipboard.writeText(text).then(function() {';
-        html += '    showStatus("已复制 " + links.length + " 个链接!");';
-        html += '  });';
-        html += '};';
-        html += '<\/script></body></html>';
+        // 直接在新窗口中绑定事件
+        const downloadUrls = extractedLinks.map(l => l.downloadUrl);
 
-        const blob = new Blob([html], { type: 'text/html' });
-        const url = URL.createObjectURL(blob);
-        window.open(url, '_blank');
+        newWin.document.getElementById('openAllBtn').onclick = function () {
+            const statusEl = newWin.document.getElementById('status');
+            statusEl.style.display = 'block';
+            statusEl.textContent = '正在打开全部链接...';
+            let opened = 0;
+            for (let i = 0; i < downloadUrls.length; i++) {
+                (function (url, idx) {
+                    setTimeout(function () {
+                        newWin.open(url, '_blank');
+                        opened++;
+                        statusEl.textContent = '已打开 ' + opened + '/' + downloadUrls.length + ' 个标签页';
+                    }, idx * 600);
+                })(downloadUrls[i], i);
+            }
+        };
+
+        newWin.document.getElementById('copyBtn').onclick = function () {
+            const statusEl = newWin.document.getElementById('status');
+            const text = downloadUrls.join('\n');
+            navigator.clipboard.writeText(text).then(function () {
+                statusEl.style.display = 'block';
+                statusEl.textContent = '已复制 ' + downloadUrls.length + ' 个链接!';
+            });
+        };
     };
 
     // ═══════════════════════════════════════════════════════════════════════════
