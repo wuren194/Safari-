@@ -1,10 +1,12 @@
 // ==UserScript==
 // @name         iGay69 Google Drive Extractor (Liquid Glass)
 // @namespace    http://tampermonkey.net/
-// @version      2.3
+// @version      2.4
 // @description  批量提取 iGay69 页面的 Google Drive 下载链接并直接下载 - Liquid Glass UI
 // @author       Antigravity
 // @match        https://igay69.com/*
+// @match        https://drive.google.com/*
+// @match        https://drive.usercontent.google.com/*
 // @grant        GM_xmlhttpRequest
 // @grant        GM_download
 // @grant        GM_addStyle
@@ -647,15 +649,98 @@
     // § 9. 初始化
     // ═══════════════════════════════════════════════════════════════════════════
 
+    // Google Drive 自动点击 "仍然下载" 按钮
+    const autoClickGDriveDownload = () => {
+        console.log('🔥 iGay69 Extractor: 检测到 Google Drive 页面，尝试自动点击下载...');
+
+        const clickDownloadButton = () => {
+            // 尝试多种可能的按钮选择器
+            const selectors = [
+                'button[aria-label*="下载"]',
+                'button[aria-label*="Download"]',
+                'form[action*="download"] button[type="submit"]',
+                'a[href*="confirm=t"]',
+                '#uc-download-link',
+                'a[id*="download"]',
+                'input[type="submit"]',
+                'button:contains("仍然下载")',
+                'button:contains("Download anyway")',
+                // 通用按钮匹配
+                'form button',
+                'form input[type="submit"]'
+            ];
+
+            for (const selector of selectors) {
+                try {
+                    const btn = document.querySelector(selector);
+                    if (btn) {
+                        console.log('🔥 找到下载按钮:', selector);
+                        btn.click();
+                        return true;
+                    }
+                } catch (e) { }
+            }
+
+            // 如果选择器都没找到，尝试通过文本内容查找
+            const allButtons = document.querySelectorAll('button, input[type="submit"], a');
+            for (const btn of allButtons) {
+                const text = (btn.textContent || btn.value || '').toLowerCase();
+                if (text.includes('仍然下载') || text.includes('download anyway') ||
+                    text.includes('仍然') || text.includes('anyway')) {
+                    console.log('🔥 通过文本找到下载按钮:', text);
+                    btn.click();
+                    return true;
+                }
+            }
+
+            // 检查是否有 form 表单可以提交
+            const form = document.querySelector('form[action*="download"], form[id*="download"]');
+            if (form) {
+                console.log('🔥 找到下载表单，自动提交');
+                form.submit();
+                return true;
+            }
+
+            return false;
+        };
+
+        // 立即尝试一次
+        if (clickDownloadButton()) return;
+
+        // 如果没找到，等待页面加载完成后再试几次
+        let attempts = 0;
+        const maxAttempts = 10;
+        const interval = setInterval(() => {
+            attempts++;
+            if (clickDownloadButton() || attempts >= maxAttempts) {
+                clearInterval(interval);
+                if (attempts >= maxAttempts) {
+                    console.log('🔥 未能自动找到下载按钮，请手动点击');
+                }
+            }
+        }, 500);
+    };
+
     const init = () => {
-        const style = document.createElement('style');
-        style.textContent = CSS;
-        document.head.appendChild(style);
+        const hostname = window.location.hostname;
 
-        injectFilter();
-        createUI();
+        // 如果是 Google Drive 页面，只执行自动点击功能
+        if (hostname.includes('drive.google.com') || hostname.includes('drive.usercontent.google.com')) {
+            autoClickGDriveDownload();
+            return;
+        }
 
-        console.log('🔥 iGay69 Extractor (Liquid Glass) 已加载');
+        // 如果是 iGay69 页面，加载完整 UI
+        if (hostname.includes('igay69.com')) {
+            const style = document.createElement('style');
+            style.textContent = CSS;
+            document.head.appendChild(style);
+
+            injectFilter();
+            createUI();
+
+            console.log('🔥 iGay69 Extractor (Liquid Glass) 已加载');
+        }
     };
 
     if (document.body) {
