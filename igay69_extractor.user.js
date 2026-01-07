@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         iGay69 Google Drive Extractor (Liquid Glass)
 // @namespace    http://tampermonkey.net/
-// @version      2.2
+// @version      2.3
 // @description  批量提取 iGay69 页面的 Google Drive 下载链接并直接下载 - Liquid Glass UI
 // @author       Antigravity
 // @match        https://igay69.com/*
@@ -10,6 +10,7 @@
 // @grant        GM_addStyle
 // @connect      igay69.com
 // @connect      drive.google.com
+// @connect      drive.usercontent.google.com
 // @run-at       document-end
 // @updateURL    https://raw.githubusercontent.com/wuren194/Safari-/main/igay69_extractor.user.js
 // @downloadURL  https://raw.githubusercontent.com/wuren194/Safari-/main/igay69_extractor.user.js
@@ -326,14 +327,17 @@
     };
 
     // 将 Google Drive 共享链接转换为直接下载链接
-    // 添加 confirm=t 绕过大文件病毒扫描警告
+    // 使用 drive.usercontent.google.com 域名并添加 confirm=t 绕过病毒扫描
     const convertToDirectDownload = (shareUrl) => {
         let fileId = null;
         const match1 = shareUrl.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
         const match2 = shareUrl.match(/[?&]id=([a-zA-Z0-9_-]+)/);
         if (match1) fileId = match1[1];
         else if (match2) fileId = match2[1];
-        if (fileId) return `https://drive.google.com/uc?export=download&confirm=t&id=${fileId}`;
+        if (fileId) {
+            // 新格式：使用 drive.usercontent.google.com 域名
+            return `https://drive.usercontent.google.com/download?id=${fileId}&export=download&confirm=t`;
+        }
         return shareUrl;
     };
 
