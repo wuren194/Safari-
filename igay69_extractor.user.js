@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         iGay69 Google Drive Extractor (Liquid Glass)
 // @namespace    http://tampermonkey.net/
-// @version      3.3
+// @version      3.4
 // @description  批量提取 iGay69 页面的 Google Drive 下载链接并直接下载 - Liquid Glass UI
 // @author       Antigravity
 // @match        https://igay69.com/*
@@ -15,6 +15,7 @@
 // @grant        GM_xmlhttpRequest
 // @grant        GM_download
 // @grant        GM_addStyle
+// @grant        GM_openInTab
 // @connect      igay69.com
 // @connect      drive.google.com
 // @connect      drive.usercontent.google.com
@@ -323,16 +324,22 @@
     let extractedLinks = [];
     let isExtracting = false;
 
-    // Safari 兼容的打开链接方法
+    // Safari 兼容的打开链接方法 (后台打开,不切换焦点)
     const safariOpenUrl = (url) => {
-        const a = document.createElement('a');
-        a.href = url;
-        a.target = '_blank';
-        a.rel = 'noopener noreferrer';
-        a.style.display = 'none';
-        document.body.appendChild(a);
-        a.click();
-        setTimeout(() => a.remove(), 100);
+        // 优先使用油猴API,支持后台打开
+        if (typeof GM_openInTab !== 'undefined') {
+            GM_openInTab(url, { active: false, insert: true, setParent: true });
+        } else {
+            // 降级方案:创建a标签模拟点击
+            const a = document.createElement('a');
+            a.href = url;
+            a.target = '_blank';
+            a.rel = 'noopener noreferrer';
+            a.style.display = 'none';
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => a.remove(), 100);
+        }
     };
 
     // ═══════════════════════════════════════════════════════════════════════════
