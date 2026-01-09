@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         iGay69 Google Drive Extractor (Liquid Glass)
 // @namespace    http://tampermonkey.net/
-// @version      3.2
+// @version      3.3
 // @description  批量提取 iGay69 页面的 Google Drive 下载链接并直接下载 - Liquid Glass UI
 // @author       Antigravity
 // @match        https://igay69.com/*
@@ -323,6 +323,18 @@
     let extractedLinks = [];
     let isExtracting = false;
 
+    // Safari 兼容的打开链接方法
+    const safariOpenUrl = (url) => {
+        const a = document.createElement('a');
+        a.href = url;
+        a.target = '_blank';
+        a.rel = 'noopener noreferrer';
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => a.remove(), 100);
+    };
+
     // ═══════════════════════════════════════════════════════════════════════════
     // § 5. 核心提取逻辑
     // ═══════════════════════════════════════════════════════════════════════════
@@ -462,7 +474,7 @@
                     dlBtn.classList.remove('loading');
                     dlBtn.classList.add('success');
                     dlBtn.innerHTML = '✓';
-                    window.open(link.downloadUrl, '_blank');
+                    safariOpenUrl(link.downloadUrl);
 
                     // 2秒后恢复按钮
                     setTimeout(() => {
@@ -723,7 +735,7 @@
             let opened = 0;
             extractedLinks.forEach((link, i) => {
                 setTimeout(() => {
-                    window.open(link.downloadUrl, '_blank');
+                    safariOpenUrl(link.downloadUrl);
                     opened++;
                     statusEl.textContent = `已打开 ${opened}/${extractedLinks.length} 个标签页`;
                 }, i * 600);
