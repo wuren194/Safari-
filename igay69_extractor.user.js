@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         iGay69 Google Drive Extractor (Liquid Glass)
 // @namespace    http://tampermonkey.net/
-// @version      3.1
+// @version      3.2
 // @description  批量提取 iGay69 页面的 Google Drive 下载链接并直接下载 - Liquid Glass UI
 // @author       Antigravity
 // @match        https://igay69.com/*
@@ -216,6 +216,35 @@
         }
         .lg-ball:hover { transform: scale(1.1); background: rgba(50,50,50,0.9); }
         .lg-ball.hidden { opacity: 0; transform: scale(0.5); pointer-events: none; }
+
+        .lg-cover-dl-btn {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s var(--lg-spring);
+            z-index: 10;
+        }
+        .lg-cover-dl-btn:hover {
+            background: rgba(10, 132, 255, 0.9);
+            transform: scale(1.1);
+            box-shadow: 0 4px 12px var(--lg-accent-glow);
+        }
+        .lg-cover-dl-btn.loading { pointer-events: none; opacity: 0.7; }
+        .lg-cover-dl-btn.success { background: rgba(52, 199, 89, 0.9); }
+        .lg-cover-dl-btn.error { background: rgba(244, 67, 54, 0.9); }
     `;
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -364,7 +393,100 @@
     };
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // § 6. UI 创建
+    // § 6. 封面下载按钮
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    // 提取单篇文章的下载链接
+    const extractSingleArticleLink = async (articleUrl, articleTitle) => {
+        try {
+            const html = await fetchPage(articleUrl);
+            const link = extractGDriveLink(html, articleTitle);
+            return link;
+        } catch (e) {
+            console.error('提取失败:', articleTitle, e);
+            return null;
+        }
+    };
+
+    // 在所有封面上注入下载按钮
+    const injectCoverDownloadButtons = () => {
+        // 选取所有文章容器
+        const articles = document.querySelectorAll('article.blog-entry');
+
+        articles.forEach(article => {
+            // 获取文章标题和链接
+            const titleLink = article.querySelector('h2.wpex-card-title a, .blog-entry-title a, h2 a');
+            if (!titleLink) return;
+
+            const articleUrl = titleLink.href;
+            const articleTitle = titleLink.textContent.trim();
+
+            // 查找封面图片容器
+            const mediaContainer = article.querySelector('.blog-entry-media, .wpex-card-media');
+            if (!mediaContainer) return;
+
+            // 检查是否已经插入过按钮
+            if (mediaContainer.querySelector('.lg-cover-dl-btn')) return;
+
+            // 创建下载按钮
+            const dlBtn = document.createElement('div');
+            dlBtn.className = 'lg-cover-dl-btn';
+            dlBtn.innerHTML = '📥';
+            dlBtn.title = '下载: ' + articleTitle;
+
+            // 确保容器是相对定位
+            if (getComputedStyle(mediaContainer).position === 'static') {
+                mediaContainer.style.position = 'relative';
+            }
+
+            // 插入按钮
+            mediaContainer.appendChild(dlBtn);
+
+            // 绑定点击事件
+            dlBtn.addEventListener('click', async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+
+                // 防止重复点击
+                if (dlBtn.classList.contains('loading')) return;
+
+                // 设置加载状态
+                dlBtn.classList.add('loading');
+                dlBtn.innerHTML = '⏳';
+
+                // 提取下载链接
+                const link = await extractSingleArticleLink(articleUrl, articleTitle);
+
+                if (link && link.downloadUrl) {
+                    // 成功：打开下载链接
+                    dlBtn.classList.remove('loading');
+                    dlBtn.classList.add('success');
+                    dlBtn.innerHTML = '✓';
+                    window.open(link.downloadUrl, '_blank');
+
+                    // 2秒后恢复按钮
+                    setTimeout(() => {
+                        dlBtn.classList.remove('success');
+                        dlBtn.innerHTML = '📥';
+                    }, 2000);
+                } else {
+                    // 失败：显示错误
+                    dlBtn.classList.remove('loading');
+                    dlBtn.classList.add('error');
+                    dlBtn.innerHTML = '✗';
+
+                    // 3秒后恢复按钮
+                    setTimeout(() => {
+                        dlBtn.classList.remove('error');
+                        dlBtn.innerHTML = '📥';
+                    }, 3000);
+                }
+            });
+        });
+    };
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // § 7. UI 创建
     // ═══════════════════════════════════════════════════════════════════════════
 
     const createUI = () => {
@@ -426,7 +548,7 @@
     };
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // § 7. UI 更新辅助函数
+    // § 8. UI 更新辅助函数
     // ═══════════════════════════════════════════════════════════════════════════
 
     const updateProgress = (percent) => {
@@ -461,7 +583,7 @@
     };
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // § 8. 提取 & 下载功能
+    // § 9. 提取 & 下载功能
     // ═══════════════════════════════════════════════════════════════════════════
 
     const startExtract = async () => {
@@ -620,7 +742,7 @@
     };
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // § 9. 初始化
+    // § 10. 初始化
     // ═══════════════════════════════════════════════════════════════════════════
 
     // Google Drive 自动点击 "仍然下载" 按钮
@@ -712,6 +834,15 @@
 
             injectFilter();
             createUI();
+
+            // 注入封面下载按钮
+            injectCoverDownloadButtons();
+
+            // 监听 DOM 变化，处理动态加载的内容
+            const observer = new MutationObserver(() => {
+                injectCoverDownloadButtons();
+            });
+            observer.observe(document.body, { childList: true, subtree: true });
 
             console.log('🔥 iGay69 Extractor (Liquid Glass) 已加载');
         }
