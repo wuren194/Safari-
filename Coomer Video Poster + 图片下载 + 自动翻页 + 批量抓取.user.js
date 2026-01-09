@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Coomer Video Poster + 图片下载 + 自动翻页 + 批量抓取
 // @namespace    http://tampermonkey.net/
-// @version      10.8
+// @version      10.9
 // @description  视频封面 + 图片下载按钮 + 自动翻页 + 批量抓取用户所有帖子 (油猴极速版)
 // @author       老司机 & AI优化
 // @match        *://coomer.su/*
@@ -192,32 +192,19 @@
             return null;
         },
 
-        // GM_xmlhttpRequest Promise 包装 (模拟浏览器请求)
-        gmFetch(url) {
-            return new Promise((resolve, reject) => {
-                GM_xmlhttpRequest({
-                    method: 'GET',
-                    url: url,
-                    timeout: CONFIG.REQUEST_TIMEOUT,
-                    headers: {
-                        'Accept': 'application/json, text/plain, */*',
-                        'Accept-Language': 'en-US,en;q=0.9',
-                        'Referer': window.location.origin + '/',
-                        'Origin': window.location.origin,
-                        'X-Requested-With': 'XMLHttpRequest'
-                    },
-                    anonymous: false, // 发送cookie
-                    onload: (response) => {
-                        if (response.status === 200) {
-                            resolve(response.responseText);
-                        } else {
-                            reject(new Error(`HTTP ${response.status}`));
-                        }
-                    },
-                    onerror: (e) => reject(new Error('Network error')),
-                    ontimeout: () => reject(new Error('Timeout'))
-                });
+        // 使用原生fetch API (携带cookie)
+        async gmFetch(url) {
+            const response = await fetch(url, {
+                method: 'GET',
+                credentials: 'include', // 携带cookie
+                headers: {
+                    'Accept': 'application/json, text/plain, */*'
+                }
             });
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            return await response.text();
         },
 
         // 解析当前URL获取service和user
