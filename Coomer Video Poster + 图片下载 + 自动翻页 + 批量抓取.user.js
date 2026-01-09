@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Coomer Video Poster + 图片下载 + 自动翻页 + 批量抓取
 // @namespace    http://tampermonkey.net/
-// @version      10.5
+// @version      10.6
 // @description  视频封面 + 图片下载按钮 + 自动翻页 + 批量抓取用户所有帖子 (油猴极速版)
 // @author       老司机 & AI优化
 // @match        *://coomer.su/*
@@ -237,9 +237,15 @@
                 'a[href*="/data/"][href*=".webp"]'
             ];
 
+            // 获取基础域名
+            const baseHost = new URL(postUrl).origin;
+
             imageSelectors.forEach(selector => {
                 doc.querySelectorAll(selector).forEach(el => {
-                    const src = el.href;
+                    // 使用getAttribute因为DOMParser解析后的href属性可能不完整
+                    let src = el.getAttribute('href') || el.href || '';
+                    // 处理相对路径
+                    if (src.startsWith('/')) src = baseHost + src;
                     if (!src || !src.includes('/data/')) return;
                     const baseUrl = Utils.getBaseUrl(src);
                     if (seen.has(baseUrl)) return;
@@ -278,7 +284,10 @@
 
             videoSelectors.forEach(selector => {
                 doc.querySelectorAll(selector).forEach(el => {
-                    const src = el.src || el.href;
+                    // 使用getAttribute因为DOMParser解析后的属性可能不完整
+                    let src = el.getAttribute('src') || el.getAttribute('href') || el.src || el.href || '';
+                    // 处理相对路径
+                    if (src.startsWith('/')) src = baseHost + src;
                     if (!src) return;
                     const baseUrl = Utils.getBaseUrl(src);
                     if (seen.has(baseUrl)) return;
