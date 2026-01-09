@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Coomer Video Poster + 图片下载 + 自动翻页 + 批量抓取
 // @namespace    http://tampermonkey.net/
-// @version      10.6
+// @version      10.7
 // @description  视频封面 + 图片下载按钮 + 自动翻页 + 批量抓取用户所有帖子 (油猴极速版)
 // @author       老司机 & AI优化
 // @match        *://coomer.su/*
@@ -170,23 +170,21 @@
         }
     };
 
-    // ========== 批量抓取核心 (GM_xmlhttpRequest 稳定版) ==========
+    // ========== 批量抓取核心 (API 稳定版) ==========
     const Scraper = {
-        // 带重试的请求函数
-        async fetchWithRetry(url, retries = CONFIG.RETRY_COUNT) {
+        // 带重试的JSON请求
+        async fetchJsonWithRetry(url, retries = CONFIG.RETRY_COUNT) {
             for (let attempt = 1; attempt <= retries; attempt++) {
                 try {
-                    const html = await this.gmFetch(url);
-                    if (html && html.length > 1000) {
-                        return html;
+                    const text = await this.gmFetch(url);
+                    if (text) {
+                        return JSON.parse(text);
                     }
-                    console.log(`[Coomer] 请求返回内容过短,重试 ${attempt}/${retries}: ${url.substring(0, 50)}...`);
                 } catch (e) {
-                    console.log(`[Coomer] 请求失败 ${attempt}/${retries}: ${e.message}`);
+                    console.log(`[Coomer] API请求失败 ${attempt}/${retries}: ${e.message}`);
                 }
 
                 if (attempt < retries) {
-                    // 指数退避
                     const delay = CONFIG.RETRY_DELAY * Math.pow(2, attempt - 1);
                     await new Promise(r => setTimeout(r, delay));
                 }
@@ -214,114 +212,114 @@
             });
         },
 
-        // 从 HTML 字符串中提取媒体
-        extractMediaFromHtml(html, postUrl, postIndex) {
+        // 解析当前URL获取service和user
+        parseUserUrl() {
+            const match = window.location.pathname.match(/^\/(onlyfans|fansly|patreon|fanbox|fantia|gumroad|subscribestar|dlsite|boosty|discord|afdian)\/user\/([^\/]+)/);
+            if (match) {
+                return { service: match[1], userId: match[2] };
+            }
+            return null;
+        },
+
+        // 解析帖子URL
+        parsePostUrl(url) {
+            const match = url.match(/\/(onlyfans|fansly|patreon|fanbox|fantia|gumroad|subscribestar|dlsite|boosty|discord|afdian)\/user\/([^\/]+)\/post\/([^\/\?]+)/);
+            if (match) {
+                return { service: match[1], userId: match[2], postId: match[3] };
+            }
+            return null;
+        },
+
+        // 从API获取用户所有帖子列表
+        async fetchAllPostsFromApi(service, userId) {
+            const baseHost = window.location.origin;
+            const allPosts = [];
+            let offset = 0;
+            const limit = 50; // API 每页限制
+
+            while (true) {
+                const apiUrl = `${baseHost}/api/v1/${service}/user/${userId}?o=${offset}`;
+                console.log(`[Coomer] 获取帖子列表: offset=${offset}`);
+
+                const posts = await this.fetchJsonWithRetry(apiUrl);
+
+                if (!posts || !Array.isArray(posts) || posts.length === 0) {
+                    break;
+                }
+
+                allPosts.push(...posts);
+
+                if (posts.length < limit) {
+                    break; // 没有更多了
+                }
+
+                offset += limit;
+                await new Promise(r => setTimeout(r, CONFIG.REQUEST_GAP));
+            }
+
+            console.log(`[Coomer] API获取到 ${allPosts.length} 个帖子`);
+            return allPosts;
+        },
+
+        // 从API帖子数据中提取媒体
+        extractMediaFromApiPost(post, postIndex, service, userId) {
             const results = [];
+            const baseHost = window.location.origin;
+            const postUrl = `${baseHost}/${service}/user/${userId}/post/${post.id}`;
             const seen = new Set();
 
-            const parser = new DOMParser();
-            const doc = parser.parseFromString(html, 'text/html');
-
-            console.log(`[Debug] 开始提取帖子 ${postIndex}: ${postUrl.substring(0, 50)}...`);
-
-            // 收集图片 - 更全面的选择器
-            const imageSelectors = [
-                '.post__files a[href*="/data/"]',
-                '.post__thumbnail a[href*="/data/"]',
-                'a.fileThumb[href*="/data/"]',
-                '.post__attachment[href*="/data/"]',
-                'a[href*="/data/"][href*=".jpg"]',
-                'a[href*="/data/"][href*=".jpeg"]',
-                'a[href*="/data/"][href*=".png"]',
-                'a[href*="/data/"][href*=".gif"]',
-                'a[href*="/data/"][href*=".webp"]'
-            ];
-
-            // 获取基础域名
-            const baseHost = new URL(postUrl).origin;
-
-            imageSelectors.forEach(selector => {
-                doc.querySelectorAll(selector).forEach(el => {
-                    // 使用getAttribute因为DOMParser解析后的href属性可能不完整
-                    let src = el.getAttribute('href') || el.href || '';
-                    // 处理相对路径
-                    if (src.startsWith('/')) src = baseHost + src;
-                    if (!src || !src.includes('/data/')) return;
-                    const baseUrl = Utils.getBaseUrl(src);
-                    if (seen.has(baseUrl)) return;
-                    if (src.includes('icon') || src.includes('avatar') || src.includes('logo')) return;
-
-                    // 必须是图片格式
-                    if (!/\.(jpg|jpeg|png|gif|webp|bmp)/i.test(src)) return;
-
-                    seen.add(baseUrl);
-
-                    const img = el.querySelector('img');
-                    results.push({
-                        type: 'image',
-                        src: src,
-                        thumb: img?.src || src,
-                        postUrl: postUrl,
-                        postIndex: postIndex,
-                        page: Math.floor(postIndex / 25) + 1,
-                        format: src.match(/\.(jpg|jpeg|png|gif|webp)/i)?.[1] || 'jpg'
-                    });
-                });
-            });
-
-            // 收集视频 - 更全面的选择器
-            const videoSelectors = [
-                'video source',
-                'video[src]',
-                'a[href*=".mp4"]',
-                'a[href*=".m4v"]',
-                'a[href*=".webm"]',
-                'a[href*=".mov"]',
-                'a.post__attachment-link[href*=".mp4"]',
-                'a.post__attachment[href*=".mp4"]',
-                '.post__files a[href*=".mp4"]'
-            ];
-
-            videoSelectors.forEach(selector => {
-                doc.querySelectorAll(selector).forEach(el => {
-                    // 使用getAttribute因为DOMParser解析后的属性可能不完整
-                    let src = el.getAttribute('src') || el.getAttribute('href') || el.src || el.href || '';
-                    // 处理相对路径
-                    if (src.startsWith('/')) src = baseHost + src;
+            // 处理 attachments (通常是图片和视频)
+            if (post.attachments && Array.isArray(post.attachments)) {
+                post.attachments.forEach(att => {
+                    const src = att.path ? `${baseHost}/data${att.path}` : att.server ? `https://${att.server}/data${att.path}` : null;
                     if (!src) return;
+
                     const baseUrl = Utils.getBaseUrl(src);
                     if (seen.has(baseUrl)) return;
-
-                    // 必须是视频格式
-                    if (!/\.(mp4|m4v|webm|mov|avi|mkv)/i.test(src)) return;
-
                     seen.add(baseUrl);
 
+                    const name = att.name || '';
+                    const isVideo = /\.(mp4|m4v|webm|mov|avi|mkv)/i.test(name) || /\.(mp4|m4v|webm|mov|avi|mkv)/i.test(src);
+
                     results.push({
-                        type: 'video',
+                        type: isVideo ? 'video' : 'image',
                         src: src,
-                        thumb: '',
+                        thumb: src,
+                        name: name,
                         postUrl: postUrl,
                         postIndex: postIndex,
                         page: Math.floor(postIndex / 25) + 1,
-                        format: src.match(/\.(mp4|m4v|webm|mov)/i)?.[1] || 'mp4',
+                        format: isVideo ? (name.match(/\.(mp4|m4v|webm|mov)/i)?.[1] || 'mp4') : (name.match(/\.(jpg|jpeg|png|gif|webp)/i)?.[1] || 'jpg'),
                         duration: null
                     });
                 });
-            });
-
-            console.log(`[Debug] 帖子 ${postIndex} 提取结果: ${results.length} 个媒体 (${results.filter(r => r.type === 'image').length} 图片, ${results.filter(r => r.type === 'video').length} 视频)`);
-            return results;
-        },
-
-        // 加载单个帖子并提取媒体
-        async loadPost(url, postIndex) {
-            const html = await this.fetchWithRetry(url);
-            if (!html) {
-                console.log(`[Coomer] 帖子加载失败: ${url.substring(0, 50)}...`);
-                return [];
             }
-            return this.extractMediaFromHtml(html, url, postIndex);
+
+            // 处理 file (通常是视频)
+            if (post.file && post.file.path) {
+                const src = `${baseHost}/data${post.file.path}`;
+                const baseUrl = Utils.getBaseUrl(src);
+
+                if (!seen.has(baseUrl)) {
+                    seen.add(baseUrl);
+                    const name = post.file.name || '';
+                    const isVideo = /\.(mp4|m4v|webm|mov|avi|mkv)/i.test(name) || /\.(mp4|m4v|webm|mov|avi|mkv)/i.test(src);
+
+                    results.push({
+                        type: isVideo ? 'video' : 'image',
+                        src: src,
+                        thumb: src,
+                        name: name,
+                        postUrl: postUrl,
+                        postIndex: postIndex,
+                        page: Math.floor(postIndex / 25) + 1,
+                        format: isVideo ? 'mp4' : 'jpg',
+                        duration: null
+                    });
+                }
+            }
+
+            return results;
         },
 
         // 从用户列表页收集帖子链接
@@ -388,7 +386,7 @@
             });
         },
 
-        // 主抓取循环 - 并发版
+        // 主抓取循环 - API版
         async startBatchScrape() {
             const isUser = Utils.isUserPage();
             const isPost = Utils.isPostPage();
@@ -406,108 +404,61 @@
             prog.style.display = 'block';
             STATE.stopScraping = false;
             STATE.allMedia = [];
-            STATE.allPostUrls = [];
 
-            // ========== 阶段1: 收集所有帖子链接 ==========
-            txt.textContent = '阶段1: 收集帖子链接...';
-            fill.style.width = '0%';
-            detail.textContent = '正在扫描用户页面...';
-
-            const allPostUrls = [];
-            const seenUrls = new Set();
-            let pageNum = 1;
+            let posts = [];
+            let userInfo = null;
 
             if (isUser) {
-                // 从用户列表页收集
-                let posts = this.collectPostLinksFromPage();
-                posts.forEach(url => {
-                    if (!seenUrls.has(url)) {
-                        seenUrls.add(url);
-                        allPostUrls.push(url);
-                    }
-                });
-                detail.textContent = `第 ${pageNum} 页，已收集 ${allPostUrls.length} 个帖子`;
-
-                // 翻页收集更多
-                while (!STATE.stopScraping && pageNum < 100) {
-                    const nextBtn = this.getNextPageButton();
-                    if (!nextBtn) break;
-
-                    pageNum++;
-                    nextBtn.click();
-                    await this.waitForPageLoad();
-                    await new Promise(r => setTimeout(r, 200));
-
-                    posts = this.collectPostLinksFromPage();
-                    let newCount = 0;
-                    posts.forEach(url => {
-                        if (!seenUrls.has(url)) {
-                            seenUrls.add(url);
-                            allPostUrls.push(url);
-                            newCount++;
-                        }
-                    });
-
-                    if (newCount === 0) break;
-                    detail.textContent = `第 ${pageNum} 页，已收集 ${allPostUrls.length} 个帖子`;
+                userInfo = this.parseUserUrl();
+            } else if (isPost) {
+                const postInfo = this.parsePostUrl(window.location.href);
+                if (postInfo) {
+                    userInfo = { service: postInfo.service, userId: postInfo.userId };
                 }
-            } else {
-                // 从帖子页面，只处理当前帖子
-                allPostUrls.push(window.location.href);
             }
 
-            if (STATE.stopScraping || allPostUrls.length === 0) {
-                prog.style.display = 'none';
+            if (!userInfo) {
+                txt.textContent = '❌ 无法解析用户信息';
+                setTimeout(() => prog.style.display = 'none', 2000);
                 return;
             }
 
-            console.log(`[Coomer] 阶段1完成，共 ${allPostUrls.length} 个帖子`);
-            STATE.allPostUrls = allPostUrls;
+            // ========== 阶段1: 通过API获取所有帖子 ==========
+            txt.textContent = '阶段1: 通过API获取帖子列表...';
+            fill.style.width = '0%';
+            detail.textContent = `用户: ${userInfo.userId} (${userInfo.service})`;
 
-            // ========== 阶2: 并发加载帖子页面提取媒体 ==========
-            txt.textContent = `阶2: 稳定抓取 ${allPostUrls.length} 个帖子...`;
-            detail.textContent = `使用 ${CONFIG.CONCURRENCY} 个并发连接 (带重试机制)`;
+            posts = await this.fetchAllPostsFromApi(userInfo.service, userInfo.userId);
+
+            if (STATE.stopScraping || posts.length === 0) {
+                txt.textContent = '❌ 获取帖子失败或没有帖子';
+                setTimeout(() => prog.style.display = 'none', 2000);
+                return;
+            }
+
+            console.log(`[Coomer] 阶段1完成，共 ${posts.length} 个帖子`);
+
+            // ========== 阶段2: 从API数据直接提取媒体 ==========
+            txt.textContent = `阶段2: 解析 ${posts.length} 个帖子的媒体...`;
+            fill.style.width = '50%';
+            detail.textContent = '直接从API数据提取,无需加载页面';
 
             const allMedia = [];
             const seenMedia = new Set();
-            let completed = 0;
-            const total = allPostUrls.length;
 
-            // 并发处理队列
-            const queue = allPostUrls.map((url, idx) => ({ url, idx }));
-            const workers = [];
+            posts.forEach((post, idx) => {
+                if (STATE.stopScraping) return;
 
-            for (let i = 0; i < CONFIG.CONCURRENCY; i++) {
-                workers.push((async () => {
-                    while (queue.length > 0 && !STATE.stopScraping) {
-                        const task = queue.shift();
-                        if (!task) break;
+                const media = this.extractMediaFromApiPost(post, idx, userInfo.service, userInfo.userId);
 
-                        const media = await this.loadPost(task.url, task.idx);
-
-                        // 请求间隔,避免触发限流
-                        await new Promise(r => setTimeout(r, CONFIG.REQUEST_GAP));
-
-                        media.forEach(m => {
-                            const key = Utils.getBaseUrl(m.src);
-                            if (!seenMedia.has(key)) {
-                                seenMedia.add(key);
-                                allMedia.push(m);
-                            }
-                        });
-
-                        completed++;
-                        const pct = Math.round(completed / total * 100);
-                        fill.style.width = `${pct}%`;
-
-                        const imgCount = allMedia.filter(m => m.type === 'image').length;
-                        const vidCount = allMedia.filter(m => m.type === 'video').length;
-                        detail.textContent = `${completed}/${total} 帖子 | ${imgCount} 图片, ${vidCount} 视频`;
+                media.forEach(m => {
+                    const key = Utils.getBaseUrl(m.src);
+                    if (!seenMedia.has(key)) {
+                        seenMedia.add(key);
+                        allMedia.push(m);
                     }
-                })());
-            }
-
-            await Promise.all(workers);
+                });
+            });
 
             // 按 postIndex 排序
             allMedia.sort((a, b) => a.postIndex - b.postIndex);
@@ -517,7 +468,7 @@
             const vidCount = allMedia.filter(m => m.type === 'video').length;
 
             txt.textContent = `完成！${imgCount} 张图片, ${vidCount} 个视频`;
-            detail.textContent = `共处理 ${total} 个帖子`;
+            detail.textContent = `共处理 ${posts.length} 个帖子`;
             fill.style.width = '100%';
 
             console.log(`[Coomer] 抓取完成: ${imgCount} 图片, ${vidCount} 视频`);
