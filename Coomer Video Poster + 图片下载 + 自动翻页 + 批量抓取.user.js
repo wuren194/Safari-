@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Coomer Video Poster + 图片下载 + 自动翻页 + 批量抓取
 // @namespace    http://tampermonkey.net/
-// @version      10.9
+// @version      11.0
 // @description  视频封面 + 图片下载按钮 + 自动翻页 + 批量抓取用户所有帖子 (油猴极速版)
 // @author       老司机 & AI优化
 // @match        *://coomer.su/*
@@ -43,10 +43,10 @@
     const CONFIG = {
         scale: GM_getValue('scale', 1.0),
         iconColor: GM_getValue('iconColor', '#ffffff'),
-        CONCURRENCY: 2, // 降低并发数保证稳定
-        REQUEST_TIMEOUT: 25000, // 请求超时 25秒
-        RETRY_COUNT: 3, // 最大重试次数
-        RETRY_DELAY: 1000, // 重试间隔基础(指数退避)
+        CONCURRENCY: 2, // 并发iframe数
+        REQUEST_TIMEOUT: 30000, // iframe加载超时 30秒
+        RETRY_COUNT: 2, // 重试次数
+        RETRY_DELAY: 2000, // 重试间隔
         REQUEST_GAP: 500, // 请求间隔
         Z_LAYERS: { BUTTON: 2147483641, MODAL: 2147483650 }
     };
@@ -170,151 +170,204 @@
         }
     };
 
-    // ========== 批量抓取核心 (API 稳定版) ==========
+    // ========== 批量抓取核心 (iframe 稳定版) ==========
     const Scraper = {
-        // 带重试的JSON请求
-        async fetchJsonWithRetry(url, retries = CONFIG.RETRY_COUNT) {
-            for (let attempt = 1; attempt <= retries; attempt++) {
-                try {
-                    const text = await this.gmFetch(url);
-                    if (text) {
-                        return JSON.parse(text);
-                    }
-                } catch (e) {
-                    console.log(`[Coomer] API请求失败 ${attempt}/${retries}: ${e.message}`);
-                }
+        iframePool: [],
 
-                if (attempt < retries) {
-                    const delay = CONFIG.RETRY_DELAY * Math.pow(2, attempt - 1);
-                    await new Promise(r => setTimeout(r, delay));
-                }
+        // 创建 iframe 池
+        createIframePool() {
+            let container = document.getElementById('coomer-iframe-pool');
+            if (!container) {
+                container = document.createElement('div');
+                container.id = 'coomer-iframe-pool';
+                container.style.cssText = 'position:fixed;left:-9999px;top:-9999px;width:1px;height:1px;overflow:hidden;visibility:hidden';
+                document.body.appendChild(container);
             }
-            return null;
+            container.innerHTML = '';
+            this.iframePool = [];
+
+            for (let i = 0; i < CONFIG.CONCURRENCY; i++) {
+                const iframe = document.createElement('iframe');
+                iframe.id = `coomer-iframe-${i}`;
+                iframe.sandbox = 'allow-same-origin allow-scripts';
+                container.appendChild(iframe);
+                this.iframePool.push({ iframe, busy: false });
+            }
         },
 
-        // 使用原生fetch API (携带cookie)
-        async gmFetch(url) {
-            const response = await fetch(url, {
-                method: 'GET',
-                credentials: 'include', // 携带cookie
-                headers: {
-                    'Accept': 'application/json, text/plain, */*'
-                }
-            });
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}`);
-            }
-            return await response.text();
+        // 销毁 iframe 池
+        destroyIframePool() {
+            const container = document.getElementById('coomer-iframe-pool');
+            if (container) container.innerHTML = '';
+            this.iframePool = [];
         },
 
-        // 解析当前URL获取service和user
-        parseUserUrl() {
-            const match = window.location.pathname.match(/^\/(onlyfans|fansly|patreon|fanbox|fantia|gumroad|subscribestar|dlsite|boosty|discord|afdian)\/user\/([^\/]+)/);
-            if (match) {
-                return { service: match[1], userId: match[2] };
-            }
-            return null;
-        },
-
-        // 解析帖子URL
-        parsePostUrl(url) {
-            const match = url.match(/\/(onlyfans|fansly|patreon|fanbox|fantia|gumroad|subscribestar|dlsite|boosty|discord|afdian)\/user\/([^\/]+)\/post\/([^\/\?]+)/);
-            if (match) {
-                return { service: match[1], userId: match[2], postId: match[3] };
-            }
-            return null;
-        },
-
-        // 从API获取用户所有帖子列表
-        async fetchAllPostsFromApi(service, userId) {
-            const baseHost = window.location.origin;
-            const allPosts = [];
-            let offset = 0;
-            const limit = 50; // API 每页限制
-
-            while (true) {
-                const apiUrl = `${baseHost}/api/v1/${service}/user/${userId}?o=${offset}`;
-                console.log(`[Coomer] 获取帖子列表: offset=${offset}`);
-
-                const posts = await this.fetchJsonWithRetry(apiUrl);
-
-                if (!posts || !Array.isArray(posts) || posts.length === 0) {
-                    break;
-                }
-
-                allPosts.push(...posts);
-
-                if (posts.length < limit) {
-                    break; // 没有更多了
-                }
-
-                offset += limit;
-                await new Promise(r => setTimeout(r, CONFIG.REQUEST_GAP));
-            }
-
-            console.log(`[Coomer] API获取到 ${allPosts.length} 个帖子`);
-            return allPosts;
-        },
-
-        // 从API帖子数据中提取媒体
-        extractMediaFromApiPost(post, postIndex, service, userId) {
+        // 从 iframe 文档中提取媒体
+        extractMediaFromDoc(doc, postUrl, postIndex) {
             const results = [];
-            const baseHost = window.location.origin;
-            const postUrl = `${baseHost}/${service}/user/${userId}/post/${post.id}`;
             const seen = new Set();
+            const baseHost = new URL(postUrl).origin;
 
-            // 处理 attachments (通常是图片和视频)
-            if (post.attachments && Array.isArray(post.attachments)) {
-                post.attachments.forEach(att => {
-                    const src = att.path ? `${baseHost}/data${att.path}` : att.server ? `https://${att.server}/data${att.path}` : null;
-                    if (!src) return;
+            // 收集图片
+            const imageSelectors = [
+                '.post__files a[href*="/data/"]',
+                '.post__thumbnail a[href*="/data/"]',
+                'a.fileThumb[href*="/data/"]',
+                '.post__attachment[href*="/data/"]',
+                'a[href*="/data/"][href$=".jpg"]',
+                'a[href*="/data/"][href$=".jpeg"]',
+                'a[href*="/data/"][href$=".png"]',
+                'a[href*="/data/"][href$=".gif"]',
+                'a[href*="/data/"][href$=".webp"]'
+            ];
 
-                    const baseUrl = Utils.getBaseUrl(src);
-                    if (seen.has(baseUrl)) return;
-                    seen.add(baseUrl);
+            imageSelectors.forEach(selector => {
+                try {
+                    doc.querySelectorAll(selector).forEach(el => {
+                        let src = el.href || el.getAttribute('href') || '';
+                        if (src.startsWith('/')) src = baseHost + src;
+                        if (!src || !src.includes('/data/')) return;
 
-                    const name = att.name || '';
-                    const isVideo = /\.(mp4|m4v|webm|mov|avi|mkv)/i.test(name) || /\.(mp4|m4v|webm|mov|avi|mkv)/i.test(src);
+                        const baseUrl = Utils.getBaseUrl(src);
+                        if (seen.has(baseUrl)) return;
+                        if (src.includes('icon') || src.includes('avatar') || src.includes('logo')) return;
+                        if (!/\.(jpg|jpeg|png|gif|webp|bmp)/i.test(src)) return;
 
-                    results.push({
-                        type: isVideo ? 'video' : 'image',
-                        src: src,
-                        thumb: src,
-                        name: name,
-                        postUrl: postUrl,
-                        postIndex: postIndex,
-                        page: Math.floor(postIndex / 25) + 1,
-                        format: isVideo ? (name.match(/\.(mp4|m4v|webm|mov)/i)?.[1] || 'mp4') : (name.match(/\.(jpg|jpeg|png|gif|webp)/i)?.[1] || 'jpg'),
-                        duration: null
+                        seen.add(baseUrl);
+                        const img = el.querySelector('img');
+                        results.push({
+                            type: 'image',
+                            src: src,
+                            thumb: img?.src || src,
+                            postUrl: postUrl,
+                            postIndex: postIndex,
+                            page: Math.floor(postIndex / 25) + 1,
+                            format: src.match(/\.(jpg|jpeg|png|gif|webp)/i)?.[1] || 'jpg'
+                        });
                     });
-                });
-            }
+                } catch (e) { }
+            });
 
-            // 处理 file (通常是视频)
-            if (post.file && post.file.path) {
-                const src = `${baseHost}/data${post.file.path}`;
-                const baseUrl = Utils.getBaseUrl(src);
+            // 收集视频
+            const videoSelectors = [
+                'video source[src]',
+                'video[src]',
+                'a[href$=".mp4"]',
+                'a[href$=".m4v"]',
+                'a[href$=".webm"]',
+                'a[href$=".mov"]',
+                '.post__files a[href*=".mp4"]'
+            ];
 
-                if (!seen.has(baseUrl)) {
-                    seen.add(baseUrl);
-                    const name = post.file.name || '';
-                    const isVideo = /\.(mp4|m4v|webm|mov|avi|mkv)/i.test(name) || /\.(mp4|m4v|webm|mov|avi|mkv)/i.test(src);
+            videoSelectors.forEach(selector => {
+                try {
+                    doc.querySelectorAll(selector).forEach(el => {
+                        let src = el.src || el.href || el.getAttribute('src') || el.getAttribute('href') || '';
+                        if (src.startsWith('/')) src = baseHost + src;
+                        if (!src) return;
 
-                    results.push({
-                        type: isVideo ? 'video' : 'image',
-                        src: src,
-                        thumb: src,
-                        name: name,
-                        postUrl: postUrl,
-                        postIndex: postIndex,
-                        page: Math.floor(postIndex / 25) + 1,
-                        format: isVideo ? 'mp4' : 'jpg',
-                        duration: null
+                        const baseUrl = Utils.getBaseUrl(src);
+                        if (seen.has(baseUrl)) return;
+                        if (!/\.(mp4|m4v|webm|mov|avi|mkv)/i.test(src)) return;
+
+                        seen.add(baseUrl);
+                        results.push({
+                            type: 'video',
+                            src: src,
+                            thumb: '',
+                            postUrl: postUrl,
+                            postIndex: postIndex,
+                            page: Math.floor(postIndex / 25) + 1,
+                            format: src.match(/\.(mp4|m4v|webm|mov)/i)?.[1] || 'mp4',
+                            duration: null
+                        });
                     });
-                }
-            }
+                } catch (e) { }
+            });
 
+            console.log(`[Debug] 帖子 ${postIndex} 提取: ${results.length} 个媒体`);
             return results;
+        },
+
+        // 使用 iframe 加载单个帖子 (带重试)
+        loadPostWithIframe(url, postIndex, retries = CONFIG.RETRY_COUNT) {
+            return new Promise(async (resolve) => {
+                for (let attempt = 1; attempt <= retries; attempt++) {
+                    const result = await this._loadPostOnce(url, postIndex);
+                    if (result.length > 0) {
+                        resolve(result);
+                        return;
+                    }
+                    if (attempt < retries) {
+                        console.log(`[Coomer] 帖子 ${postIndex} 重试 ${attempt}/${retries}`);
+                        await new Promise(r => setTimeout(r, CONFIG.RETRY_DELAY * attempt));
+                    }
+                }
+                resolve([]);
+            });
+        },
+
+        // 单次iframe加载
+        _loadPostOnce(url, postIndex) {
+            return new Promise((resolve) => {
+                const slot = this.iframePool.find(s => !s.busy);
+                if (!slot) {
+                    resolve([]);
+                    return;
+                }
+
+                slot.busy = true;
+                const iframe = slot.iframe;
+                let resolved = false;
+
+                const cleanup = () => {
+                    slot.busy = false;
+                    iframe.onload = null;
+                    iframe.onerror = null;
+                };
+
+                const timeout = setTimeout(() => {
+                    if (!resolved) {
+                        resolved = true;
+                        cleanup();
+                        console.log(`[Coomer] iframe 超时: ${url.substring(0, 50)}...`);
+                        resolve([]);
+                    }
+                }, CONFIG.REQUEST_TIMEOUT);
+
+                iframe.onload = () => {
+                    if (resolved) return;
+
+                    // 等待React渲染 (增加到4秒)
+                    setTimeout(() => {
+                        if (resolved) return;
+                        resolved = true;
+                        clearTimeout(timeout);
+
+                        try {
+                            const doc = iframe.contentDocument || iframe.contentWindow.document;
+                            const media = this.extractMediaFromDoc(doc, url, postIndex);
+                            cleanup();
+                            resolve(media);
+                        } catch (e) {
+                            console.error(`[Coomer] iframe 提取失败:`, e.message);
+                            cleanup();
+                            resolve([]);
+                        }
+                    }, 4000);
+                };
+
+                iframe.onerror = () => {
+                    if (!resolved) {
+                        resolved = true;
+                        clearTimeout(timeout);
+                        cleanup();
+                        resolve([]);
+                    }
+                };
+
+                iframe.src = url;
+            });
         },
 
         // 从用户列表页收集帖子链接
@@ -381,7 +434,7 @@
             });
         },
 
-        // 主抓取循环 - API版
+        // 主抓取循环 - iframe版
         async startBatchScrape() {
             const isUser = Utils.isUserPage();
             const isPost = Utils.isPostPage();
@@ -399,63 +452,108 @@
             prog.style.display = 'block';
             STATE.stopScraping = false;
             STATE.allMedia = [];
+            STATE.allPostUrls = [];
 
-            let posts = [];
-            let userInfo = null;
+            // ========== 阶段1: 收集所有帖子链接 ==========
+            txt.textContent = '阶段1: 收集帖子链接...';
+            fill.style.width = '0%';
+            detail.textContent = '正在扫描用户页面...';
+
+            const allPostUrls = [];
+            const seenUrls = new Set();
+            let pageNum = 1;
 
             if (isUser) {
-                userInfo = this.parseUserUrl();
-            } else if (isPost) {
-                const postInfo = this.parsePostUrl(window.location.href);
-                if (postInfo) {
-                    userInfo = { service: postInfo.service, userId: postInfo.userId };
+                let posts = this.collectPostLinksFromPage();
+                posts.forEach(url => {
+                    if (!seenUrls.has(url)) {
+                        seenUrls.add(url);
+                        allPostUrls.push(url);
+                    }
+                });
+                detail.textContent = `第 ${pageNum} 页，已收集 ${allPostUrls.length} 个帖子`;
+
+                // 翻页收集更多 (无限制)
+                while (!STATE.stopScraping) {
+                    const nextBtn = this.getNextPageButton();
+                    if (!nextBtn) break;
+
+                    pageNum++;
+                    nextBtn.click();
+                    await this.waitForPageLoad();
+                    await new Promise(r => setTimeout(r, 300));
+
+                    posts = this.collectPostLinksFromPage();
+                    let newCount = 0;
+                    posts.forEach(url => {
+                        if (!seenUrls.has(url)) {
+                            seenUrls.add(url);
+                            allPostUrls.push(url);
+                            newCount++;
+                        }
+                    });
+
+                    if (newCount === 0) break;
+                    detail.textContent = `第 ${pageNum} 页，已收集 ${allPostUrls.length} 个帖子`;
                 }
+            } else {
+                allPostUrls.push(window.location.href);
             }
 
-            if (!userInfo) {
-                txt.textContent = '❌ 无法解析用户信息';
-                setTimeout(() => prog.style.display = 'none', 2000);
+            if (STATE.stopScraping || allPostUrls.length === 0) {
+                prog.style.display = 'none';
                 return;
             }
 
-            // ========== 阶段1: 通过API获取所有帖子 ==========
-            txt.textContent = '阶段1: 通过API获取帖子列表...';
-            fill.style.width = '0%';
-            detail.textContent = `用户: ${userInfo.userId} (${userInfo.service})`;
+            console.log(`[Coomer] 阶段1完成，共 ${allPostUrls.length} 个帖子`);
+            STATE.allPostUrls = allPostUrls;
 
-            posts = await this.fetchAllPostsFromApi(userInfo.service, userInfo.userId);
+            // ========== 阶段2: 用iframe并发加载帖子提取媒体 ==========
+            txt.textContent = `阶段2: 加载 ${allPostUrls.length} 个帖子...`;
+            detail.textContent = `使用 ${CONFIG.CONCURRENCY} 个并发 + 重试机制`;
 
-            if (STATE.stopScraping || posts.length === 0) {
-                txt.textContent = '❌ 获取帖子失败或没有帖子';
-                setTimeout(() => prog.style.display = 'none', 2000);
-                return;
-            }
-
-            console.log(`[Coomer] 阶段1完成，共 ${posts.length} 个帖子`);
-
-            // ========== 阶段2: 从API数据直接提取媒体 ==========
-            txt.textContent = `阶段2: 解析 ${posts.length} 个帖子的媒体...`;
-            fill.style.width = '50%';
-            detail.textContent = '直接从API数据提取,无需加载页面';
+            this.createIframePool();
 
             const allMedia = [];
             const seenMedia = new Set();
+            let completed = 0;
+            const total = allPostUrls.length;
 
-            posts.forEach((post, idx) => {
-                if (STATE.stopScraping) return;
+            const queue = allPostUrls.map((url, idx) => ({ url, idx }));
+            const workers = [];
 
-                const media = this.extractMediaFromApiPost(post, idx, userInfo.service, userInfo.userId);
+            for (let i = 0; i < CONFIG.CONCURRENCY; i++) {
+                workers.push((async () => {
+                    while (queue.length > 0 && !STATE.stopScraping) {
+                        const task = queue.shift();
+                        if (!task) break;
 
-                media.forEach(m => {
-                    const key = Utils.getBaseUrl(m.src);
-                    if (!seenMedia.has(key)) {
-                        seenMedia.add(key);
-                        allMedia.push(m);
+                        const media = await this.loadPostWithIframe(task.url, task.idx);
+
+                        media.forEach(m => {
+                            const key = Utils.getBaseUrl(m.src);
+                            if (!seenMedia.has(key)) {
+                                seenMedia.add(key);
+                                allMedia.push(m);
+                            }
+                        });
+
+                        completed++;
+                        const pct = Math.round(completed / total * 100);
+                        fill.style.width = `${pct}%`;
+
+                        const imgCount = allMedia.filter(m => m.type === 'image').length;
+                        const vidCount = allMedia.filter(m => m.type === 'video').length;
+                        detail.textContent = `${completed}/${total} 帖子 | ${imgCount} 图片, ${vidCount} 视频`;
+
+                        await new Promise(r => setTimeout(r, CONFIG.REQUEST_GAP));
                     }
-                });
-            });
+                })());
+            }
 
-            // 按 postIndex 排序
+            await Promise.all(workers);
+            this.destroyIframePool();
+
             allMedia.sort((a, b) => a.postIndex - b.postIndex);
             STATE.allMedia = allMedia;
 
@@ -463,7 +561,7 @@
             const vidCount = allMedia.filter(m => m.type === 'video').length;
 
             txt.textContent = `完成！${imgCount} 张图片, ${vidCount} 个视频`;
-            detail.textContent = `共处理 ${posts.length} 个帖子`;
+            detail.textContent = `共处理 ${total} 个帖子`;
             fill.style.width = '100%';
 
             console.log(`[Coomer] 抓取完成: ${imgCount} 图片, ${vidCount} 视频`);
