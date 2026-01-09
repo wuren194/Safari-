@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Coomer Video Poster + 图片下载 + 自动翻页 + 批量抓取
 // @namespace    http://tampermonkey.net/
-// @version      10.7
+// @version      10.8
 // @description  视频封面 + 图片下载按钮 + 自动翻页 + 批量抓取用户所有帖子 (油猴极速版)
 // @author       老司机 & AI优化
 // @match        *://coomer.su/*
@@ -192,13 +192,21 @@
             return null;
         },
 
-        // GM_xmlhttpRequest Promise 包装
+        // GM_xmlhttpRequest Promise 包装 (模拟浏览器请求)
         gmFetch(url) {
             return new Promise((resolve, reject) => {
                 GM_xmlhttpRequest({
                     method: 'GET',
                     url: url,
                     timeout: CONFIG.REQUEST_TIMEOUT,
+                    headers: {
+                        'Accept': 'application/json, text/plain, */*',
+                        'Accept-Language': 'en-US,en;q=0.9',
+                        'Referer': window.location.origin + '/',
+                        'Origin': window.location.origin,
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    anonymous: false, // 发送cookie
                     onload: (response) => {
                         if (response.status === 200) {
                             resolve(response.responseText);
