@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Coomer Video Poster + 图片下载 + 自动翻页 + 批量抓取
 // @namespace    http://tampermonkey.net/
-// @version      10.4
+// @version      10.5
 // @description  视频封面 + 图片下载按钮 + 自动翻页 + 批量抓取用户所有帖子 (油猴极速版)
 // @author       老司机 & AI优化
 // @match        *://coomer.su/*
@@ -43,8 +43,11 @@
     const CONFIG = {
         scale: GM_getValue('scale', 1.0),
         iconColor: GM_getValue('iconColor', '#ffffff'),
-        CONCURRENCY: 3, // 并发 iframe 数量（稳定优先）
-        IFRAME_TIMEOUT: 15000, // iframe 加载超时
+        CONCURRENCY: 2, // 降低并发数保证稳定
+        REQUEST_TIMEOUT: 25000, // 请求超时 25秒
+        RETRY_COUNT: 3, // 最大重试次数
+        RETRY_DELAY: 1000, // 重试间隔基础(指数退避)
+        REQUEST_GAP: 500, // 请求间隔
         Z_LAYERS: { BUTTON: 2147483641, MODAL: 2147483650 }
     };
 
@@ -142,8 +145,6 @@
         /* 统计栏 */
         .coomer-stats{display:flex;gap:20px;font-size:13px;color:var(--text-secondary)}
         
-        /* 隐藏 iframe 容器 */
-        #coomer-iframe-pool{position:fixed;left:-9999px;top:-9999px;width:1px;height:1px;overflow:hidden;visibility:hidden}
     `);
 
     // ========== 工具函数 ==========
@@ -169,43 +170,59 @@
         }
     };
 
-    // ========== 批量抓取核心 (并发 iframe 版) ==========
+    // ========== 批量抓取核心 (GM_xmlhttpRequest 稳定版) ==========
     const Scraper = {
-        iframePool: [],
+        // 带重试的请求函数
+        async fetchWithRetry(url, retries = CONFIG.RETRY_COUNT) {
+            for (let attempt = 1; attempt <= retries; attempt++) {
+                try {
+                    const html = await this.gmFetch(url);
+                    if (html && html.length > 1000) {
+                        return html;
+                    }
+                    console.log(`[Coomer] 请求返回内容过短,重试 ${attempt}/${retries}: ${url.substring(0, 50)}...`);
+                } catch (e) {
+                    console.log(`[Coomer] 请求失败 ${attempt}/${retries}: ${e.message}`);
+                }
 
-        // 创建 iframe 池
-        createIframePool() {
-            let container = document.getElementById('coomer-iframe-pool');
-            if (!container) {
-                container = document.createElement('div');
-                container.id = 'coomer-iframe-pool';
-                document.body.appendChild(container);
+                if (attempt < retries) {
+                    // 指数退避
+                    const delay = CONFIG.RETRY_DELAY * Math.pow(2, attempt - 1);
+                    await new Promise(r => setTimeout(r, delay));
+                }
             }
-            container.innerHTML = '';
-            this.iframePool = [];
-
-            for (let i = 0; i < CONFIG.CONCURRENCY; i++) {
-                const iframe = document.createElement('iframe');
-                iframe.id = `coomer-iframe-${i}`;
-                iframe.sandbox = 'allow-same-origin allow-scripts';
-                container.appendChild(iframe);
-                this.iframePool.push({ iframe, busy: false });
-            }
+            return null;
         },
 
-        // 销毁 iframe 池
-        destroyIframePool() {
-            const container = document.getElementById('coomer-iframe-pool');
-            if (container) container.innerHTML = '';
-            this.iframePool = [];
+        // GM_xmlhttpRequest Promise 包装
+        gmFetch(url) {
+            return new Promise((resolve, reject) => {
+                GM_xmlhttpRequest({
+                    method: 'GET',
+                    url: url,
+                    timeout: CONFIG.REQUEST_TIMEOUT,
+                    onload: (response) => {
+                        if (response.status === 200) {
+                            resolve(response.responseText);
+                        } else {
+                            reject(new Error(`HTTP ${response.status}`));
+                        }
+                    },
+                    onerror: (e) => reject(new Error('Network error')),
+                    ontimeout: () => reject(new Error('Timeout'))
+                });
+            });
         },
 
-        // 从 iframe 文档中提取媒体
-        extractMediaFromDoc(doc, postUrl, postIndex) {
+        // 从 HTML 字符串中提取媒体
+        extractMediaFromHtml(html, postUrl, postIndex) {
             const results = [];
             const seen = new Set();
 
-            console.log(`[Debug] 开始提取帖子 ${postIndex}:`, postUrl);
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+
+            console.log(`[Debug] 开始提取帖子 ${postIndex}: ${postUrl.substring(0, 50)}...`);
 
             // 收集图片 - 更全面的选择器
             const imageSelectors = [
@@ -288,69 +305,14 @@
             return results;
         },
 
-        // 使用 iframe 加载单个帖子并提取媒体
-        loadPostWithIframe(url, postIndex) {
-            return new Promise((resolve) => {
-                // 获取空闲 iframe
-                const slot = this.iframePool.find(s => !s.busy);
-                if (!slot) {
-                    resolve([]);
-                    return;
-                }
-
-                slot.busy = true;
-                const iframe = slot.iframe;
-                let resolved = false;
-
-                const cleanup = () => {
-                    slot.busy = false;
-                    iframe.onload = null;
-                    iframe.onerror = null;
-                };
-
-                const timeout = setTimeout(() => {
-                    if (!resolved) {
-                        resolved = true;
-                        cleanup();
-                        console.log(`[Coomer] iframe 超时: ${url}`);
-                        resolve([]);
-                    }
-                }, CONFIG.IFRAME_TIMEOUT);
-
-                iframe.onload = () => {
-                    if (resolved) return;
-
-                    // 等待 React 渲染
-                    setTimeout(() => {
-                        if (resolved) return;
-                        resolved = true;
-                        clearTimeout(timeout);
-
-                        try {
-                            const doc = iframe.contentDocument || iframe.contentWindow.document;
-                            console.log(`[Coomer] iframe 加载完成: ${url.substring(0, 50)}...`);
-                            const media = this.extractMediaFromDoc(doc, url, postIndex);
-                            cleanup();
-                            resolve(media);
-                        } catch (e) {
-                            console.error(`[Coomer] iframe 提取失败:`, e);
-                            cleanup();
-                            resolve([]);
-                        }
-                    }, 3000); // 3秒稳定版，确保完全渲染
-                };
-
-                iframe.onerror = () => {
-                    if (!resolved) {
-                        resolved = true;
-                        clearTimeout(timeout);
-                        cleanup();
-                        resolve([]);
-                    }
-                };
-
-                iframe.src = url;
-            });
+        // 加载单个帖子并提取媒体
+        async loadPost(url, postIndex) {
+            const html = await this.fetchWithRetry(url);
+            if (!html) {
+                console.log(`[Coomer] 帖子加载失败: ${url.substring(0, 50)}...`);
+                return [];
+            }
+            return this.extractMediaFromHtml(html, url, postIndex);
         },
 
         // 从用户列表页收集帖子链接
@@ -493,11 +455,9 @@
             console.log(`[Coomer] 阶段1完成，共 ${allPostUrls.length} 个帖子`);
             STATE.allPostUrls = allPostUrls;
 
-            // ========== 阶段2: 并发加载帖子页面提取媒体 ==========
-            txt.textContent = `阶段2: 并发抓取 ${allPostUrls.length} 个帖子...`;
-            detail.textContent = `使用 ${CONFIG.CONCURRENCY} 个并发连接`;
-
-            this.createIframePool();
+            // ========== 阶2: 并发加载帖子页面提取媒体 ==========
+            txt.textContent = `阶2: 稳定抓取 ${allPostUrls.length} 个帖子...`;
+            detail.textContent = `使用 ${CONFIG.CONCURRENCY} 个并发连接 (带重试机制)`;
 
             const allMedia = [];
             const seenMedia = new Set();
@@ -514,7 +474,10 @@
                         const task = queue.shift();
                         if (!task) break;
 
-                        const media = await this.loadPostWithIframe(task.url, task.idx);
+                        const media = await this.loadPost(task.url, task.idx);
+
+                        // 请求间隔,避免触发限流
+                        await new Promise(r => setTimeout(r, CONFIG.REQUEST_GAP));
 
                         media.forEach(m => {
                             const key = Utils.getBaseUrl(m.src);
@@ -536,8 +499,6 @@
             }
 
             await Promise.all(workers);
-
-            this.destroyIframePool();
 
             // 按 postIndex 排序
             allMedia.sort((a, b) => a.postIndex - b.postIndex);
