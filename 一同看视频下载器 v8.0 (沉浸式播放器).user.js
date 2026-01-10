@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         一同看视频下载器 v8.0 (沉浸式播放器)
 // @namespace    http://tampermonkey.net/
-// @version      8.0
+// @version      8.1
 // @description  一键用 Downie 4 下载一同看视频，自定义沉浸式播放器界面。
 // @author       Antigravity & You
 // @match        *://www.yitongkan.com/*
@@ -195,6 +195,64 @@
                 font-size: 13px;
             }
 
+            /* ═══════════════════════════════════════════════════════════════════════ */
+            /* § 搜索框                                                                */
+            /* ═══════════════════════════════════════════════════════════════════════ */
+            .ytk-search-box {
+                position: absolute;
+                top: 20px;
+                right: 20px;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                background: rgba(255, 255, 255, 0.08);
+                backdrop-filter: blur(20px);
+                -webkit-backdrop-filter: blur(20px);
+                border: 1px solid rgba(255, 255, 255, 0.12);
+                border-radius: 12px;
+                padding: 6px 12px;
+                z-index: 100;
+            }
+
+            .ytk-search-input {
+                width: 180px;
+                background: transparent;
+                border: none;
+                outline: none;
+                color: #fff;
+                font-size: 14px;
+                font-family: inherit;
+            }
+
+            .ytk-search-input::placeholder {
+                color: rgba(255, 255, 255, 0.4);
+            }
+
+            .ytk-search-btn {
+                width: 28px;
+                height: 28px;
+                border-radius: 8px;
+                border: none;
+                background: rgba(0, 122, 255, 0.8);
+                color: #fff;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                transition: all 0.2s ease;
+            }
+
+            .ytk-search-btn:hover {
+                background: rgba(0, 122, 255, 1);
+                transform: scale(1.05);
+            }
+
+            .ytk-search-btn svg {
+                width: 14px;
+                height: 14px;
+                fill: currentColor;
+            }
+
 
 
             /* ═══════════════════════════════════════════════════════════════════════ */
@@ -354,6 +412,32 @@
             <h1 class="ytk-video-title">${sanitizeFilename(currentTitle)}</h1>
         `;
 
+        // 搜索框
+        const searchBox = document.createElement('div');
+        searchBox.className = 'ytk-search-box';
+        searchBox.innerHTML = `
+            <input type="text" class="ytk-search-input" placeholder="搜索视频..." />
+            <button class="ytk-search-btn" title="搜索">
+                <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+            </button>
+        `;
+
+        // 搜索功能
+        const searchInput = searchBox.querySelector('.ytk-search-input');
+        const searchBtn = searchBox.querySelector('.ytk-search-btn');
+
+        const doSearch = () => {
+            const keyword = searchInput.value.trim();
+            if (keyword) {
+                window.location.href = `https://www.yitongkan.com/seacher-${encodeURIComponent(keyword)}-1.html`;
+            }
+        };
+
+        searchInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') doSearch();
+        });
+        searchBtn.addEventListener('click', doSearch);
+
         // 视频盒子
         const videoBox = document.createElement('div');
         videoBox.className = 'ytk-video-box';
@@ -381,6 +465,7 @@
             </button>
         `;
 
+        container.appendChild(searchBox);
         container.appendChild(headerEl);
         container.appendChild(controlsEl);
         container.appendChild(videoBox);
