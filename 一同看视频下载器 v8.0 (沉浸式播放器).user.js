@@ -30,7 +30,7 @@
         overlays.forEach(overlay => {
             overlay.setAttribute('ytk-overlay-done', '1');
 
-            // 精准找 Tailwind group 容器（classList 里有独立的 "group" class）
+            // 精准找 Tailwind group 容器
             let card = overlay.parentElement;
             while (card && card !== document.body) {
                 if (card.classList.contains('group')) break;
@@ -40,7 +40,7 @@
             if (card.hasAttribute(CARD_BTN_ATTR)) return;
             card.setAttribute(CARD_BTN_ATTR, '1');
 
-            // 取 href：card 本身是 <a> 则直接取，否则找内部第一个有 href 的 <a>
+            // 取 href
             const getHref = () => {
                 if (card.tagName === 'A' && card.getAttribute('href')) {
                     return card.getAttribute('href');
@@ -49,40 +49,39 @@
                 return inner ? inner.getAttribute('href') : null;
             };
 
-            if (getComputedStyle(card).position === 'static') {
-                card.style.position = 'relative';
-            }
+            // 找标题 h3
+            const h3 = card.querySelector('h3');
+            if (!h3) return;
 
-            const btn = document.createElement('button');
+            const btn = document.createElement('span');
             btn.textContent = '↗';
             btn.title = '在新标签页打开';
             btn.style.cssText = `
-                position: absolute;
-                top: 6px;
-                right: 6px;
-                z-index: 2147483647;
-                width: 30px;
-                height: 30px;
-                border-radius: 8px;
-                border: none;
-                background: rgba(0,0,0,0.65);
-                color: #fff;
-                font-size: 16px;
-                cursor: pointer;
-                display: flex;
+                display: inline-flex;
                 align-items: center;
                 justify-content: center;
-                opacity: 0;
-                transition: opacity 0.15s ease;
-                backdrop-filter: blur(6px);
-                -webkit-backdrop-filter: blur(6px);
+                width: 22px;
+                height: 22px;
+                border-radius: 5px;
+                background: rgba(168, 85, 247, 0.12);
+                color: #a855f7;
+                font-size: 13px;
+                cursor: pointer;
+                margin-right: 4px;
+                vertical-align: middle;
+                transition: background 0.15s ease, color 0.15s ease;
                 line-height: 1;
-                padding: 0;
-                pointer-events: auto;
+                flex-shrink: 0;
             `;
 
-            card.addEventListener('mouseenter', () => btn.style.opacity = '1');
-            card.addEventListener('mouseleave', () => btn.style.opacity = '0');
+            btn.addEventListener('mouseenter', () => {
+                btn.style.background = '#a855f7';
+                btn.style.color = '#fff';
+            });
+            btn.addEventListener('mouseleave', () => {
+                btn.style.background = 'rgba(168, 85, 247, 0.12)';
+                btn.style.color = '#a855f7';
+            });
 
             btn.addEventListener('click', (e) => {
                 e.preventDefault();
@@ -93,7 +92,7 @@
                 window.open(fullUrl, '_blank');
             });
 
-            card.appendChild(btn);
+            h3.insertBefore(btn, h3.firstChild);
         });
     };
 
