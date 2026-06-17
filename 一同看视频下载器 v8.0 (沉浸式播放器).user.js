@@ -23,7 +23,6 @@
     const CARD_BTN_ATTR = 'ytk-newtab-injected';
 
     const injectNewTabButtons = () => {
-        // 精准找到那个粉紫渐变覆盖层（唯一特征），从它向上找到 <a>
         const overlays = document.querySelectorAll(
             'div[class*="from-pink-500"][class*="inset-0"]:not([ytk-overlay-done])'
         );
@@ -31,13 +30,27 @@
         overlays.forEach(overlay => {
             overlay.setAttribute('ytk-overlay-done', '1');
 
-            const link = overlay.closest('a');
-            if (!link) return;
-            if (link.hasAttribute(CARD_BTN_ATTR)) return;
-            link.setAttribute(CARD_BTN_ATTR, '1');
+            // 精准找 Tailwind group 容器（classList 里有独立的 "group" class）
+            let card = overlay.parentElement;
+            while (card && card !== document.body) {
+                if (card.classList.contains('group')) break;
+                card = card.parentElement;
+            }
+            if (!card || card === document.body) return;
+            if (card.hasAttribute(CARD_BTN_ATTR)) return;
+            card.setAttribute(CARD_BTN_ATTR, '1');
 
-            if (getComputedStyle(link).position === 'static') {
-                link.style.position = 'relative';
+            // 取 href：card 本身是 <a> 则直接取，否则找内部第一个有 href 的 <a>
+            const getHref = () => {
+                if (card.tagName === 'A' && card.getAttribute('href')) {
+                    return card.getAttribute('href');
+                }
+                const inner = card.querySelector('a[href]');
+                return inner ? inner.getAttribute('href') : null;
+            };
+
+            if (getComputedStyle(card).position === 'static') {
+                card.style.position = 'relative';
             }
 
             const btn = document.createElement('button');
@@ -68,19 +81,19 @@
                 pointer-events: auto;
             `;
 
-            link.addEventListener('mouseenter', () => btn.style.opacity = '1');
-            link.addEventListener('mouseleave', () => btn.style.opacity = '0');
+            card.addEventListener('mouseenter', () => btn.style.opacity = '1');
+            card.addEventListener('mouseleave', () => btn.style.opacity = '0');
 
             btn.addEventListener('click', (e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                const href = link.getAttribute('href');
-                const fullUrl = href && href.startsWith('/') ? location.origin + href : href;
-                if (fullUrl) window.open(fullUrl, '_blank');
+                const href = getHref();
+                if (!href) return;
+                const fullUrl = href.startsWith('/') ? location.origin + href : href;
+                window.open(fullUrl, '_blank');
             });
 
-            // 插到覆盖层之后，保证在最顶层
-            link.appendChild(btn);
+            card.appendChild(btn);
         });
     };
 
