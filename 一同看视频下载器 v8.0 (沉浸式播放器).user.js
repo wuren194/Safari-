@@ -18,29 +18,36 @@
 (function () {
     'use strict';
     // ═══════════════════════════════════════════════════════════════════════════
-    // § 0. 新标签页打开视频链接拦截器
+    // § 0. 新标签页强制拦截（从 pushState/replaceState 层面劫持，兼容 React 路由）
     // ═══════════════════════════════════════════════════════════════════════════
+    const isPlayUrl = (url) => {
+        if (!url) return false;
+        const str = typeof url === 'string' ? url : url.toString();
+        return /\/(gv|mv|tv|video|play|detail|watch)\//.test(str) || 
+               /play-\d/.test(str);
+    };
+
+    // Hook pushState：如果跳转到的是播放页，强行用新标签页打开并阻止当前页跳转
+    const _origPushState = history.pushState.bind(history);
+    history.pushState = function (state, title, url) {
+        if (url && isPlayUrl(url)) {
+            const fullUrl = url.startsWith('/') ? location.origin + url : url;
+            window.open(fullUrl, '_blank');
+            return; // 不让当前页面跳转
+        }
+        return _origPushState(state, title, url);
+    };
+
+    // 同样处理 <a> 标签点击（兜底）
     document.addEventListener('click', (e) => {
         const anchor = e.target.closest('a');
         if (!anchor) return;
-        
         const href = anchor.getAttribute('href');
-        if (!href) return;
-        
+        if (!href || !isPlayUrl(href)) return;
+        e.preventDefault();
+        e.stopPropagation();
         const fullUrl = href.startsWith('/') ? location.origin + href : href;
-        
-        // 如果是视频播放链接，强行在新标签页打开
-        const isPlayLink = href.includes('play') || 
-                           href.includes('/gv/') || 
-                           href.includes('/mv/') || 
-                           href.includes('/tv/') || 
-                           href.includes('/video/');
-                           
-        if (isPlayLink) {
-            e.preventDefault();
-            e.stopPropagation();
-            window.open(fullUrl, '_blank');
-        }
+        window.open(fullUrl, '_blank');
     }, true);
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -117,14 +124,21 @@
     setInterval(checkUrlChange, 500);
 
     const wrapHistory = (type) => {
-        const orig = history[type];
+        const orig = type === 'pushState' ? _origPushState : history[type].bind(history);
         return function (...args) {
-            const res = orig.apply(this, args);
+            const res = orig(...args);
             checkUrlChange();
             return res;
         };
     };
-    history.pushState = wrapHistory('pushState');
+    history.pushState = new Proxy(history.pushState, {
+        apply(target, thisArg, args) {
+            // 播放页已经在上面的 Hook 里拦截并 window.open 了，这里只处理非播放页跳转后的路由变化检测
+            const res = Reflect.apply(target, thisArg, args);
+            checkUrlChange();
+            return res;
+        }
+    });
     history.replaceState = wrapHistory('replaceState');
     window.addEventListener('popstate', checkUrlChange);
     window.addEventListener('hashchange', checkUrlChange);
