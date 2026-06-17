@@ -17,6 +17,31 @@
 
 (function () {
     'use strict';
+    // ═══════════════════════════════════════════════════════════════════════════
+    // § 0. 新标签页打开视频链接拦截器
+    // ═══════════════════════════════════════════════════════════════════════════
+    document.addEventListener('click', (e) => {
+        const anchor = e.target.closest('a');
+        if (!anchor) return;
+        
+        const href = anchor.getAttribute('href');
+        if (!href) return;
+        
+        const fullUrl = href.startsWith('/') ? location.origin + href : href;
+        
+        // 如果是视频播放链接，强行在新标签页打开
+        const isPlayLink = href.includes('play') || 
+                           href.includes('/gv/') || 
+                           href.includes('/mv/') || 
+                           href.includes('/tv/') || 
+                           href.includes('/video/');
+                           
+        if (isPlayLink) {
+            e.preventDefault();
+            e.stopPropagation();
+            window.open(fullUrl, '_blank');
+        }
+    }, true);
 
     // ═══════════════════════════════════════════════════════════════════════════
     // § 1. 拦截器 Hook 模块 (XHR / Fetch)
