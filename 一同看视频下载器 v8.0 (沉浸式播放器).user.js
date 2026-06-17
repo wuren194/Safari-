@@ -18,48 +18,81 @@
 (function () {
     'use strict';
     // ═══════════════════════════════════════════════════════════════════════════
-    // § 0. 新标签页强制拦截
-    // 注意：Tampermonkey 沙箱里改 history.pushState 对页面真实上下文无效。
-    // 必须把拦截代码注入进页面真实的 <script> 标签里才能劫持 React 的路由。
+    // § 0. 视频卡片「在新标签页打开」按钮注入
     // ═══════════════════════════════════════════════════════════════════════════
-    const injectPageScript = () => {
-        const s = document.createElement('script');
-        s.textContent = `(function() {
-    var isPlayUrl = function(url) {
-        if (!url) return false;
-        var str = typeof url === 'string' ? url : String(url);
-        return /(\\/(gv|mv|tv|video|play|detail|watch)\\/)|(play-\\d)/.test(str);
-    };
-    var _origPushState = history.pushState.bind(history);
-    history.pushState = function(state, title, url) {
-        if (url && isPlayUrl(url)) {
-            var fullUrl = (typeof url === 'string' && url.charAt(0) === '/') 
-                ? location.origin + url : url;
-            window.open(fullUrl, '_blank');
-            return; // 彻底阻止当前页面跳转
-        }
-        return _origPushState(state, title, url);
-    };
-    // <a> 标签兜底
-    document.addEventListener('click', function(e) {
-        var anchor = e.target && e.target.closest && e.target.closest('a');
-        if (!anchor) return;
-        var href = anchor.getAttribute('href');
-        if (!href || !isPlayUrl(href)) return;
-        e.preventDefault();
-        e.stopPropagation();
-        var fullUrl = href.charAt(0) === '/' ? location.origin + href : href;
-        window.open(fullUrl, '_blank');
-    }, true);
-})();`;
-        (document.head || document.documentElement).appendChild(s);
-        s.remove();
+    const CARD_BTN_ATTR = 'ytk-newtab-injected';
+
+    const injectNewTabButtons = () => {
+        // 找所有含播放路径的 <a> 标签（视频卡片的父级链接）
+        const links = document.querySelectorAll(
+            `a[href*="/gv/"]:not([${CARD_BTN_ATTR}]),
+             a[href*="/mv/"]:not([${CARD_BTN_ATTR}]),
+             a[href*="/tv/"]:not([${CARD_BTN_ATTR}]),
+             a[href*="play"]:not([${CARD_BTN_ATTR}])`
+        );
+
+        links.forEach(link => {
+            link.setAttribute(CARD_BTN_ATTR, '1');
+            // 让父容器支持相对定位（放置悬浮按钮）
+            const parent = link.parentElement;
+            if (parent) parent.style.position = 'relative';
+
+            const btn = document.createElement('button');
+            btn.textContent = '↗';
+            btn.title = '在新标签页打开';
+            btn.style.cssText = `
+                position: absolute;
+                top: 6px;
+                right: 6px;
+                z-index: 9999;
+                width: 26px;
+                height: 26px;
+                border-radius: 6px;
+                border: none;
+                background: rgba(0,0,0,0.55);
+                color: #fff;
+                font-size: 14px;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                opacity: 0;
+                transition: opacity 0.15s ease;
+                backdrop-filter: blur(4px);
+                -webkit-backdrop-filter: blur(4px);
+                line-height: 1;
+                padding: 0;
+            `;
+
+            // 鼠标悬浮时才显示按钮
+            if (parent) {
+                parent.addEventListener('mouseenter', () => btn.style.opacity = '1');
+                parent.addEventListener('mouseleave', () => btn.style.opacity = '0');
+            }
+
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const href = link.getAttribute('href');
+                const fullUrl = href && href.startsWith('/') ? location.origin + href : href;
+                if (fullUrl) window.open(fullUrl, '_blank');
+            });
+
+            // 将按钮插入到 link 的父元素里（而不是 link 内部，避免触发 link 自身的点击）
+            if (parent) {
+                parent.appendChild(btn);
+            }
+        });
     };
 
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', injectPageScript);
+    // 监听 DOM 变化，SPA 动态加载卡片时也能注入
+    const cardObserver = new MutationObserver(() => injectNewTabButtons());
+    cardObserver.observe(document.documentElement, { childList: true, subtree: true });
+    // 立即执行一次
+    if (document.body) {
+        injectNewTabButtons();
     } else {
-        injectPageScript();
+        document.addEventListener('DOMContentLoaded', injectNewTabButtons);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
