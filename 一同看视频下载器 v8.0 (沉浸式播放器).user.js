@@ -18,39 +18,49 @@
 (function () {
     'use strict';
     // ═══════════════════════════════════════════════════════════════════════════
-    // § 0. 新标签页强制拦截（从 pushState 层面劫持，兼容 React 路由，阻止原页面跳转）
+    // § 0. 新标签页强制拦截
+    // 注意：Tampermonkey 沙箱里改 history.pushState 对页面真实上下文无效。
+    // 必须把拦截代码注入进页面真实的 <script> 标签里才能劫持 React 的路由。
     // ═══════════════════════════════════════════════════════════════════════════
-    const isPlayUrl = (url) => {
+    const injectPageScript = () => {
+        const s = document.createElement('script');
+        s.textContent = `(function() {
+    var isPlayUrl = function(url) {
         if (!url) return false;
-        const str = typeof url === 'string' ? url : url.toString();
-        return /\/(gv|mv|tv|video|play|detail|watch)\//.test(str) || 
-               /play-\d/.test(str);
+        var str = typeof url === 'string' ? url : String(url);
+        return /(\\/(gv|mv|tv|video|play|detail|watch)\\/)|(play-\\d)/.test(str);
     };
-
-    const _origPushState = history.pushState.bind(history);
-    // 单一干净 Hook，不套 Proxy，不会双重触发
-    history.pushState = function (state, title, url) {
+    var _origPushState = history.pushState.bind(history);
+    history.pushState = function(state, title, url) {
         if (url && isPlayUrl(url)) {
-            const fullUrl = (typeof url === 'string' && url.startsWith('/')) ? location.origin + url : url;
+            var fullUrl = (typeof url === 'string' && url.charAt(0) === '/') 
+                ? location.origin + url : url;
             window.open(fullUrl, '_blank');
             return; // 彻底阻止当前页面跳转
         }
-        const res = _origPushState(state, title, url);
-        setTimeout(checkUrlChange, 0); // 非播放页跳转，正常触发路由变化检测
-        return res;
+        return _origPushState(state, title, url);
     };
-
-    // <a> 标签点击兜底
-    document.addEventListener('click', (e) => {
-        const anchor = e.target.closest('a');
+    // <a> 标签兜底
+    document.addEventListener('click', function(e) {
+        var anchor = e.target && e.target.closest && e.target.closest('a');
         if (!anchor) return;
-        const href = anchor.getAttribute('href');
+        var href = anchor.getAttribute('href');
         if (!href || !isPlayUrl(href)) return;
         e.preventDefault();
         e.stopPropagation();
-        const fullUrl = href.startsWith('/') ? location.origin + href : href;
+        var fullUrl = href.charAt(0) === '/' ? location.origin + href : href;
         window.open(fullUrl, '_blank');
     }, true);
+})();`;
+        (document.head || document.documentElement).appendChild(s);
+        s.remove();
+    };
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', injectPageScript);
+    } else {
+        injectPageScript();
+    }
 
     // ═══════════════════════════════════════════════════════════════════════════
     // § 1. 拦截器 Hook 模块 (XHR / Fetch)
