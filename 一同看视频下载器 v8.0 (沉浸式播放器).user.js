@@ -40,15 +40,6 @@
             if (card.hasAttribute(CARD_BTN_ATTR)) return;
             card.setAttribute(CARD_BTN_ATTR, '1');
 
-            // 取 href
-            const getHref = () => {
-                if (card.tagName === 'A' && card.getAttribute('href')) {
-                    return card.getAttribute('href');
-                }
-                const inner = card.querySelector('a[href]');
-                return inner ? inner.getAttribute('href') : null;
-            };
-
             // 找标题 h3
             const h3 = card.querySelector('h3');
             if (!h3) return;
@@ -86,10 +77,29 @@
             btn.addEventListener('click', (e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                const href = getHref();
-                if (!href) return;
-                const fullUrl = href.startsWith('/') ? location.origin + href : href;
-                window.open(fullUrl, '_blank');
+
+                // 往页面真实 JS 上下文注入一次性 pushState 陷阱
+                // 当 React onClick 触发 pushState 时，陷阱截获 URL 并开新标签页
+                const trapScript = document.createElement('script');
+                trapScript.textContent = `(function() {
+    var orig = history.pushState;
+    history.pushState = function(state, title, url) {
+        history.pushState = orig; // 立即恢复，一次性
+        if (url) {
+            var fullUrl = (typeof url === 'string' && url.charAt(0) === '/') 
+                ? location.origin + url : String(url);
+            window.open(fullUrl, '_blank');
+        }
+        // 不调用 orig，阻止当前页面跳转
+    };
+    // 200ms 后兜底恢复，防止没触发时卡死
+    setTimeout(function() { history.pushState = orig; }, 200);
+})();`;
+                document.head.appendChild(trapScript);
+                trapScript.remove();
+
+                // 模拟点击卡片，触发 React 的 onClick → pushState → 被陷阱截获
+                card.click();
             });
 
             h3.insertBefore(btn, h3.firstChild);
