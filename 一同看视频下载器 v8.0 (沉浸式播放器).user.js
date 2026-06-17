@@ -40,74 +40,40 @@
             if (card.hasAttribute(CARD_BTN_ATTR)) return;
             card.setAttribute(CARD_BTN_ATTR, '1');
 
-            // 找标题 h3
+            // 找标题 h3，点击标题触发新标签页打开
             const h3 = card.querySelector('h3');
             if (!h3) return;
 
-            const btn = document.createElement('span');
-            btn.textContent = '↗';
-            btn.title = '在新标签页打开';
-            btn.style.cssText = `
-                display: inline-flex;
-                align-items: center;
-                justify-content: center;
-                width: 22px;
-                height: 22px;
-                border-radius: 5px;
-                background: rgba(168, 85, 247, 0.12);
-                color: #a855f7;
-                font-size: 13px;
-                cursor: pointer;
-                margin-right: 4px;
-                vertical-align: middle;
-                transition: background 0.15s ease, color 0.15s ease;
-                line-height: 1;
-                flex-shrink: 0;
-            `;
+            h3.style.cursor = 'pointer';
 
-            btn.addEventListener('mouseenter', () => {
-                btn.style.background = '#a855f7';
-                btn.style.color = '#fff';
-            });
-            btn.addEventListener('mouseleave', () => {
-                btn.style.background = 'rgba(168, 85, 247, 0.12)';
-                btn.style.color = '#a855f7';
-            });
-
-            btn.addEventListener('click', (e) => {
+            h3.addEventListener('click', (e) => {
                 e.preventDefault();
                 e.stopPropagation();
 
-                // 往页面真实 JS 上下文注入一次性 pushState 陷阱
-                // 当 React onClick 触发 pushState 时，陷阱截获 URL 并开新标签页
                 const trapScript = document.createElement('script');
                 trapScript.textContent = `(function() {
     var orig = history.pushState;
     history.pushState = function(state, title, url) {
-        history.pushState = orig; // 立即恢复，一次性
-        // 先让 pushState 正常执行（React 内部状态和 URL 同步更新）
+        history.pushState = orig;
         orig.call(history, state, title, url);
         if (url) {
             var fullUrl = (typeof url === 'string' && url.charAt(0) === '/') 
                 ? location.origin + url : String(url);
             window.open(fullUrl, '_blank');
+            // 留在原标签页
+            setTimeout(function() { window.focus(); }, 50);
         }
-        // 然后立刻回退，React Router 收到 popstate 会恢复原页面
-        setTimeout(function() { history.back(); }, 50);
+        setTimeout(function() { history.back(); }, 80);
     };
-    // 200ms 后兜底恢复，防止没触发时卡死
     setTimeout(function() { history.pushState = orig; }, 200);
 })();`;
                 document.head.appendChild(trapScript);
                 trapScript.remove();
-
-                // 模拟点击卡片，触发 React 的 onClick → pushState → 被陷阱截获
                 card.click();
             });
-
-            h3.insertBefore(btn, h3.firstChild);
         });
     };
+
 
 
     // 监听 DOM 变化，SPA 动态加载卡片时也能注入
