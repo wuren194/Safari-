@@ -85,12 +85,15 @@
     var orig = history.pushState;
     history.pushState = function(state, title, url) {
         history.pushState = orig; // 立即恢复，一次性
+        // 先让 pushState 正常执行（React 内部状态和 URL 同步更新）
+        orig.call(history, state, title, url);
         if (url) {
             var fullUrl = (typeof url === 'string' && url.charAt(0) === '/') 
                 ? location.origin + url : String(url);
             window.open(fullUrl, '_blank');
         }
-        // 不调用 orig，阻止当前页面跳转
+        // 然后立刻回退，React Router 收到 popstate 会恢复原页面
+        setTimeout(function() { history.back(); }, 50);
     };
     // 200ms 后兜底恢复，防止没触发时卡死
     setTimeout(function() { history.pushState = orig; }, 200);
