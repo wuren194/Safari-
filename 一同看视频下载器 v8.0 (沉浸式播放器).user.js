@@ -23,17 +23,19 @@
     const CARD_BTN_ATTR = 'ytk-newtab-injected';
 
     const injectNewTabButtons = () => {
-        const links = document.querySelectorAll(
-            `a[href*="/gv/"]:not([${CARD_BTN_ATTR}]),
-             a[href*="/mv/"]:not([${CARD_BTN_ATTR}]),
-             a[href*="/tv/"]:not([${CARD_BTN_ATTR}]),
-             a[href*="play"]:not([${CARD_BTN_ATTR}])`
+        // 精准找到那个粉紫渐变覆盖层（唯一特征），从它向上找到 <a>
+        const overlays = document.querySelectorAll(
+            'div[class*="from-pink-500"][class*="inset-0"]:not([ytk-overlay-done])'
         );
 
-        links.forEach(link => {
+        overlays.forEach(overlay => {
+            overlay.setAttribute('ytk-overlay-done', '1');
+
+            const link = overlay.closest('a');
+            if (!link) return;
+            if (link.hasAttribute(CARD_BTN_ATTR)) return;
             link.setAttribute(CARD_BTN_ATTR, '1');
 
-            // <a> 本身加 relative 以便按钮绝对定位
             if (getComputedStyle(link).position === 'static') {
                 link.style.position = 'relative';
             }
@@ -45,14 +47,14 @@
                 position: absolute;
                 top: 6px;
                 right: 6px;
-                z-index: 99999;
-                width: 28px;
-                height: 28px;
-                border-radius: 7px;
+                z-index: 2147483647;
+                width: 30px;
+                height: 30px;
+                border-radius: 8px;
                 border: none;
-                background: rgba(0,0,0,0.6);
+                background: rgba(0,0,0,0.65);
                 color: #fff;
-                font-size: 15px;
+                font-size: 16px;
                 cursor: pointer;
                 display: flex;
                 align-items: center;
@@ -77,6 +79,7 @@
                 if (fullUrl) window.open(fullUrl, '_blank');
             });
 
+            // 插到覆盖层之后，保证在最顶层
             link.appendChild(btn);
         });
     };
