@@ -23,7 +23,6 @@
     const CARD_BTN_ATTR = 'ytk-newtab-injected';
 
     const injectNewTabButtons = () => {
-        // 找所有含播放路径的 <a> 标签（视频卡片的父级链接）
         const links = document.querySelectorAll(
             `a[href*="/gv/"]:not([${CARD_BTN_ATTR}]),
              a[href*="/mv/"]:not([${CARD_BTN_ATTR}]),
@@ -33,9 +32,11 @@
 
         links.forEach(link => {
             link.setAttribute(CARD_BTN_ATTR, '1');
-            // 让父容器支持相对定位（放置悬浮按钮）
-            const parent = link.parentElement;
-            if (parent) parent.style.position = 'relative';
+
+            // <a> 本身加 relative 以便按钮绝对定位
+            if (getComputedStyle(link).position === 'static') {
+                link.style.position = 'relative';
+            }
 
             const btn = document.createElement('button');
             btn.textContent = '↗';
@@ -44,31 +45,29 @@
                 position: absolute;
                 top: 6px;
                 right: 6px;
-                z-index: 9999;
-                width: 26px;
-                height: 26px;
-                border-radius: 6px;
+                z-index: 99999;
+                width: 28px;
+                height: 28px;
+                border-radius: 7px;
                 border: none;
-                background: rgba(0,0,0,0.55);
+                background: rgba(0,0,0,0.6);
                 color: #fff;
-                font-size: 14px;
+                font-size: 15px;
                 cursor: pointer;
                 display: flex;
                 align-items: center;
                 justify-content: center;
                 opacity: 0;
                 transition: opacity 0.15s ease;
-                backdrop-filter: blur(4px);
-                -webkit-backdrop-filter: blur(4px);
+                backdrop-filter: blur(6px);
+                -webkit-backdrop-filter: blur(6px);
                 line-height: 1;
                 padding: 0;
+                pointer-events: auto;
             `;
 
-            // 鼠标悬浮时才显示按钮
-            if (parent) {
-                parent.addEventListener('mouseenter', () => btn.style.opacity = '1');
-                parent.addEventListener('mouseleave', () => btn.style.opacity = '0');
-            }
+            link.addEventListener('mouseenter', () => btn.style.opacity = '1');
+            link.addEventListener('mouseleave', () => btn.style.opacity = '0');
 
             btn.addEventListener('click', (e) => {
                 e.preventDefault();
@@ -78,12 +77,10 @@
                 if (fullUrl) window.open(fullUrl, '_blank');
             });
 
-            // 将按钮插入到 link 的父元素里（而不是 link 内部，避免触发 link 自身的点击）
-            if (parent) {
-                parent.appendChild(btn);
-            }
+            link.appendChild(btn);
         });
     };
+
 
     // 监听 DOM 变化，SPA 动态加载卡片时也能注入
     const cardObserver = new MutationObserver(() => injectNewTabButtons());
