@@ -56,6 +56,29 @@
         }
     }
 
+    // 监听 DOM 中的 video 元素进行兜底检测（防止原生播放器不走 fetch/XHR）
+    const checkOriginalVideo = () => {
+        if (document.querySelector('.ytk-player-container')) return;
+        
+        const videosInDom = document.querySelectorAll('video');
+        for (const vid of videosInDom) {
+            let src = vid.src || vid.getAttribute('src') || '';
+            if (src && src.includes('.m3u8')) {
+                handleM3u8Found(src);
+                return;
+            }
+            const sources = vid.querySelectorAll('source');
+            for (const s of sources) {
+                let sSrc = s.src || s.getAttribute('src') || '';
+                if (sSrc && sSrc.includes('.m3u8')) {
+                    handleM3u8Found(sSrc);
+                    return;
+                }
+            }
+        }
+    };
+    setInterval(checkOriginalVideo, 500);
+
     // ═══════════════════════════════════════════════════════════════════════════
     // § 2. SPA 路由监控模块
     // ═══════════════════════════════════════════════════════════════════════════
@@ -83,11 +106,14 @@
 
     function isPlayPage() {
         const path = location.pathname;
-        return path.includes('play-') || 
-               path.includes('/play') || 
-               path.includes('/gv/') || 
-               path.includes('/mv/') || 
-               path.includes('/tv/');
+        return path.includes('play') || 
+               path.includes('/gv') || 
+               path.includes('/mv') || 
+               path.includes('/tv') || 
+               path.includes('/video') || 
+               path.includes('/watch') || 
+               path.includes('/content') || 
+               path.includes('/detail');
     }
 
     function handleUrlChanged() {
