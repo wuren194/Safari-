@@ -636,7 +636,7 @@
 
             const finalName = sanitizeFilename(currentTitle || 'video');
             copyToClipboard(finalName);
-            window.location.href = `downie://XUOpenURL?url=${encodeURIComponent(url)}`;
+            window.location.href = `downie://XUOpenURL?url=${encodeURIComponent(url)}&title=${encodeURIComponent(finalName)}`;
             
             this.innerHTML = '已发送';
             this.classList.add('success');
