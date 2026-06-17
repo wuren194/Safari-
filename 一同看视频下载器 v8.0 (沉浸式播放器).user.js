@@ -18,7 +18,7 @@
 (function () {
     'use strict';
     // ═══════════════════════════════════════════════════════════════════════════
-    // § 0. 新标签页强制拦截（从 pushState/replaceState 层面劫持，兼容 React 路由）
+    // § 0. 新标签页强制拦截（从 pushState 层面劫持，兼容 React 路由，阻止原页面跳转）
     // ═══════════════════════════════════════════════════════════════════════════
     const isPlayUrl = (url) => {
         if (!url) return false;
@@ -27,18 +27,20 @@
                /play-\d/.test(str);
     };
 
-    // Hook pushState：如果跳转到的是播放页，强行用新标签页打开并阻止当前页跳转
     const _origPushState = history.pushState.bind(history);
+    // 单一干净 Hook，不套 Proxy，不会双重触发
     history.pushState = function (state, title, url) {
         if (url && isPlayUrl(url)) {
-            const fullUrl = url.startsWith('/') ? location.origin + url : url;
+            const fullUrl = (typeof url === 'string' && url.startsWith('/')) ? location.origin + url : url;
             window.open(fullUrl, '_blank');
-            return; // 不让当前页面跳转
+            return; // 彻底阻止当前页面跳转
         }
-        return _origPushState(state, title, url);
+        const res = _origPushState(state, title, url);
+        setTimeout(checkUrlChange, 0); // 非播放页跳转，正常触发路由变化检测
+        return res;
     };
 
-    // 同样处理 <a> 标签点击（兜底）
+    // <a> 标签点击兜底
     document.addEventListener('click', (e) => {
         const anchor = e.target.closest('a');
         if (!anchor) return;
@@ -124,22 +126,16 @@
     setInterval(checkUrlChange, 500);
 
     const wrapHistory = (type) => {
-        const orig = type === 'pushState' ? _origPushState : history[type].bind(history);
+        const orig = history[type].bind(history);
         return function (...args) {
             const res = orig(...args);
             checkUrlChange();
             return res;
         };
     };
-    history.pushState = new Proxy(history.pushState, {
-        apply(target, thisArg, args) {
-            // 播放页已经在上面的 Hook 里拦截并 window.open 了，这里只处理非播放页跳转后的路由变化检测
-            const res = Reflect.apply(target, thisArg, args);
-            checkUrlChange();
-            return res;
-        }
-    });
+    // pushState 已经在 § 0 里完整处理，这里只需要包一层 replaceState
     history.replaceState = wrapHistory('replaceState');
+
     window.addEventListener('popstate', checkUrlChange);
     window.addEventListener('hashchange', checkUrlChange);
 
